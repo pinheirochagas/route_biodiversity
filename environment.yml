@@ -1,0 +1,14 @@
+name: strava-dashboard
+channels:
+  - defaults
+dependencies:
+  - python=3.9.12
+  - ipywidgets
+  - matplotlib
+  - folium
+  - branca
+  - numpy
+  - voila
+  - pip:
+    - stravalib==0.10.2
+    - pint==0.9
