@@ -9,6 +9,7 @@ dependencies:
   - branca
   - numpy
   - voila
+  - gpxpy
   - pip:
     - stravalib==0.10.2
     - pint==0.9
