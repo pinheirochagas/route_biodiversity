@@ -12,26 +12,28 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body class="bg-white text-gray-900 antialiased">
 
   <!-- Header -->
-  <header class="border-b border-gray-100">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between">
+  <header class="app-header">
+    <div class="header-inner">
       <div>
-        <h1 class="text-lg font-semibold tracking-tight">Route to Biodiversity</h1>
-        <p class="text-sm text-gray-400 mt-0.5">Discover species along your route</p>
+        <h1 class="text-sm font-semibold tracking-tight">Route to Biodiversity</h1>
       </div>
-      <div id="auth-area">
+      <div id="auth-area" class="flex items-center gap-2">
         <a href="/auth/strava" id="btn-connect"
-           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-700 transition-colors">
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 transition-colors">
           Connect Strava
         </a>
-        <div id="auth-connected" class="hidden flex items-center gap-3">
-          <span class="text-sm text-gray-500">Strava connected</span>
+        <div id="auth-connected" class="hidden items-center gap-2">
+          <span class="text-[10px] text-gray-400">Connected</span>
           <button id="btn-logout"
-                  class="text-sm text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2">
+                  class="text-[10px] text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2">
             Disconnect
           </button>
         </div>
@@ -39,162 +41,170 @@
     </div>
   </header>
 
-  <!-- Main -->
-  <main class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+  <!-- App Shell: 3 panels -->
+  <div class="app-shell">
 
-    <!-- Introduction -->
-    <section class="mb-12">
-      <p class="text-gray-500 text-sm leading-relaxed max-w-2xl">
-        Explore the biodiversity along your athletic routes. Connect a
-        <a href="https://www.strava.com" target="_blank" class="text-gray-900 underline underline-offset-2">Strava</a>
-        activity or upload a GPX file to see the most observed species nearby, powered by
-        <a href="https://www.inaturalist.org" target="_blank" class="text-gray-900 underline underline-offset-2">iNaturalist</a>.
-      </p>
-    </section>
+    <!-- PANEL 1: Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-scroll">
 
-    <!-- Route Input -->
-    <section id="section-input" class="mb-12">
-      <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Route</h2>
+        <!-- Route Input -->
+        <div class="sidebar-section">
+          <div class="sidebar-label">Route</div>
+          <div class="flex gap-1 mb-2 bg-gray-50 rounded-md p-0.5">
+            <button data-tab="strava" class="tab-btn active flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
+              Strava
+            </button>
+            <button data-tab="gpx" class="tab-btn flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
+              GPX
+            </button>
+          </div>
 
-      <!-- Tabs -->
-      <div class="flex gap-1 mb-6 bg-gray-50 rounded-lg p-1 w-fit">
-        <button data-tab="strava" class="tab-btn active px-4 py-2.5 text-sm font-medium rounded-md transition-colors min-h-[44px]">
-          Strava Activity
-        </button>
-        <button data-tab="gpx" class="tab-btn px-4 py-2.5 text-sm font-medium rounded-md transition-colors min-h-[44px]">
-          Upload GPX
-        </button>
-      </div>
+          <div id="tab-strava" class="tab-panel">
+            <div class="flex gap-1.5 mb-2">
+              <input type="text" id="activity-url" placeholder="Strava URL..."
+                     class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 placeholder-gray-300">
+              <button id="btn-fetch"
+                      class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 transition-colors disabled:opacity-40 whitespace-nowrap">
+                Go
+              </button>
+            </div>
+            <div id="recent-activities" class="hidden">
+              <div class="flex items-baseline justify-between" style="margin-bottom:4px">
+                <div class="sidebar-label" style="margin-bottom:0">Activities <span class="text-[9px] text-gray-300 font-normal">(6 mo)</span></div>
+                <a href="https://www.strava.com/athlete/training" target="_blank" class="text-[9px] text-gray-400 hover:text-gray-600 transition-colors">
+                  All on Strava &rarr;
+                </a>
+              </div>
+              <input type="text" id="activity-search" placeholder="Search activities..."
+                     class="w-full px-2 py-1.5 mb-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 placeholder-gray-300">
+              <div id="activities-list" class="space-y-0"></div>
+            </div>
+          </div>
 
-      <!-- Strava Input -->
-      <div id="tab-strava" class="tab-panel">
-        <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
-          <input type="text" id="activity-url" placeholder="https://www.strava.com/activities/..."
-                 class="flex-1 px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent placeholder-gray-300 transition-shadow min-h-[44px]">
-          <button id="btn-fetch"
-                  class="px-5 py-2.5 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]">
-            Fetch Route
+          <div id="tab-gpx" class="tab-panel hidden">
+            <label class="relative flex items-center justify-center w-full h-16 border border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-gray-300 transition-colors">
+              <p class="text-[11px] text-gray-400">Drop GPX or <span class="text-gray-700 underline">browse</span></p>
+              <input type="file" id="gpx-file" accept=".gpx" class="absolute inset-0 opacity-0 cursor-pointer">
+            </label>
+          </div>
+        </div>
+
+        <!-- Route Info (shown after load) -->
+        <div id="route-info" class="sidebar-section hidden">
+          <div class="sidebar-label">Loaded Route</div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="route-name" class="text-xs font-medium text-gray-800 truncate"></span>
+            <span id="route-country" class="text-[10px] text-gray-400"></span>
+          </div>
+          <div id="territories" class="mt-1"></div>
+        </div>
+
+
+        <!-- Taxa filters (shown after load) -->
+        <div id="taxa-section" class="sidebar-section hidden">
+          <div class="sidebar-label">Taxa</div>
+          <div id="taxa-filters" class="space-y-0.5"></div>
+        </div>
+
+        <!-- Map controls for mobile -->
+        <div id="mobile-map-section" class="sidebar-section mobile-only hidden">
+          <button id="mobile-map-toggle" class="mobile-map-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z" clip-rule="evenodd"/></svg>
+            Show Map
           </button>
         </div>
-        <!-- Recent Activities -->
-        <div id="recent-activities" class="hidden">
-          <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Recent activities</p>
-          <div id="activities-list" class="space-y-1"></div>
+
+        <!-- Footer -->
+        <div class="sidebar-footer">
+          <p class="text-[9px] text-gray-300 leading-relaxed">
+            <a href="https://www.inaturalist.org" target="_blank" class="underline">iNaturalist</a> &middot;
+            <a href="https://native-land.ca" target="_blank" class="underline">Native Land</a> &middot;
+            <a href="https://github.com/pinheirochagas/route_biodiversity" target="_blank" class="underline">GitHub</a>
+          </p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- PANEL 2: Species Center -->
+    <main class="panel-center" id="panel-center">
+
+      <!-- Route info bar -->
+      <div id="route-info-bar" class="route-info-bar hidden">
+        <span id="route-name-top" class="text-xs font-medium text-gray-700"></span>
+        <span id="route-country-top" class="text-[10px] text-gray-400"></span>
+        <span class="text-[10px] text-gray-300">&middot;</span>
+        <span id="territories-top" class="text-[10px] text-gray-400"></span>
+      </div>
+
+      <!-- Filters bar (dropdowns only) -->
+      <div id="filters-section" class="filters-bar hidden">
+        <div class="filters-row">
+          <select id="month-select" class="filter-select">
+            <option value="0">Year-round</option>
+            <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+            <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+            <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+            <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+          </select>
+          <select id="show-select" class="filter-select">
+            <option value="all">All species</option>
+            <option value="top10">Top 10</option>
+            <option value="top25">Top 25</option>
+          </select>
+          <select id="sort-select" class="filter-select">
+            <option value="observations">Most observed</option>
+            <option value="name">A &rarr; Z</option>
+          </select>
         </div>
       </div>
 
-      <!-- GPX Input -->
-      <div id="tab-gpx" class="tab-panel hidden">
-        <label class="relative flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-gray-300 transition-colors group">
-          <div class="text-center">
-            <p class="text-sm text-gray-400 group-hover:text-gray-500">Drop a GPX file or <span class="text-gray-900 underline underline-offset-2">browse</span></p>
-          </div>
-          <input type="file" id="gpx-file" accept=".gpx" class="absolute inset-0 opacity-0 cursor-pointer">
-        </label>
-      </div>
-    </section>
-
-    <!-- Loading -->
-    <div id="loading" class="hidden text-center py-16">
-      <div class="inline-flex items-center gap-3 text-sm text-gray-400">
-        <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+      <!-- Loading -->
+      <div id="loading" class="hidden panel-message">
+        <svg class="animate-spin h-4 w-4 text-gray-300" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle>
           <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"></path>
         </svg>
-        <span id="loading-text">Fetching route data...</span>
+        <span id="loading-text" class="text-xs text-gray-400">Fetching route data...</span>
       </div>
-    </div>
 
-    <!-- Error -->
-    <div id="error" class="hidden mb-8 p-4 rounded-lg bg-red-50 border border-red-100">
-      <p id="error-text" class="text-sm text-red-600"></p>
-    </div>
-
-    <!-- Results Container -->
-    <div id="results" class="hidden space-y-12">
-
-      <!-- Route Info + Indigenous Territories -->
-      <section>
-        <div class="flex items-baseline gap-3 mb-4">
-          <h2 id="route-name" class="text-xl font-semibold"></h2>
-          <span id="route-country" class="text-sm text-gray-400"></span>
-        </div>
-        <div id="territories" class="text-sm text-gray-500 mb-6"></div>
-      </section>
-
-      <!-- Map -->
-      <section>
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Map</h2>
-        <div id="map" class="w-full h-64 sm:h-96 rounded-xl border border-gray-100 overflow-hidden"></div>
-      </section>
-
-      <!-- Species Controls -->
-      <section>
-        <div class="mb-6">
-          <div class="mb-3">
-            <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-1">Species</h2>
-            <p class="text-sm text-gray-400">Top observed species near your route</p>
-          </div>
-          <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div class="flex items-center gap-2">
-              <label for="buffer-range" class="text-xs text-gray-400 whitespace-nowrap">Search area</label>
-              <input type="range" id="buffer-range" min="-40" max="20" value="0" step="5"
-                     class="flex-1 sm:w-24 accent-gray-900">
-              <span id="buffer-label" class="text-xs text-gray-500 w-10">0%</span>
-            </div>
-            <div class="flex gap-2">
-              <select id="month-select"
-                      class="flex-1 sm:flex-none px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 min-h-[44px]">
-                <option value="0">Year-round</option>
-                <option value="1">January</option>
-                <option value="2">February</option>
-                <option value="3">March</option>
-                <option value="4">April</option>
-                <option value="5">May</option>
-                <option value="6">June</option>
-                <option value="7">July</option>
-                <option value="8">August</option>
-                <option value="9">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-              </select>
-              <button id="btn-species"
-                      class="px-5 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-700 transition-colors disabled:opacity-40 min-h-[44px]">
-                Load Species
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <!-- Error -->
+      <div id="error" class="hidden mx-4 mt-4 p-3 rounded-lg bg-red-50 border border-red-100">
+        <p id="error-text" class="text-xs text-red-600"></p>
+      </div>
 
       <!-- Species Loading -->
-      <div id="species-loading" class="hidden text-center py-12">
-        <div class="inline-flex items-center gap-3 text-sm text-gray-400">
-          <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle>
-            <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"></path>
-          </svg>
-          <span>Querying iNaturalist...</span>
-        </div>
+      <div id="species-loading" class="hidden panel-message">
+        <svg class="animate-spin h-4 w-4 text-gray-300" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle>
+          <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"></path>
+        </svg>
+        <span class="text-xs text-gray-400">Querying iNaturalist...</span>
       </div>
 
       <!-- Species Grid -->
-      <div id="species-container"></div>
+      <div id="species-container" class="species-grid-container"></div>
 
-    </div>
-  </main>
+      <!-- Empty state -->
+      <div id="empty-state" class="panel-message">
+        <div class="text-center">
+          <p class="text-sm text-gray-300 mb-1">No route loaded</p>
+          <p class="text-xs text-gray-300">Connect Strava or upload a GPX file to explore biodiversity.</p>
+        </div>
+      </div>
+    </main>
 
-  <!-- Footer -->
-  <footer class="border-t border-gray-100 mt-20">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-      <p class="text-xs text-gray-300 text-center sm:text-left">
-        Data from <a href="https://www.inaturalist.org" target="_blank" class="underline">iNaturalist</a>
-        &middot; Indigenous territories from <a href="https://native-land.ca" target="_blank" class="underline">Native Land</a>
-      </p>
-      <a href="https://github.com/pinheirochagas/route_biodiversity" target="_blank" class="text-xs text-gray-300 underline">GitHub</a>
+    <!-- PANEL 3: Map -->
+    <div class="panel-map" id="panel-map">
+      <div id="map" class="w-full h-full"></div>
+      <button id="mobile-map-close" class="mobile-map-close">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+        </svg>
+      </button>
     </div>
-  </footer>
+
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

@@ -1,9 +1,144 @@
-/* Base */
+/* ── Base ── */
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  margin: 0;
+  overflow: hidden;
+  height: 100vh;
 }
 
-/* Tabs */
+/* ── Header ── */
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #f3f4f6;
+}
+.header-inner {
+  height: 100%;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── App Shell: 3-panel ── */
+.app-shell {
+  display: flex;
+  height: calc(100vh - 44px);
+  margin-top: 44px;
+}
+
+/* ── Panel 1: Sidebar ── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-section {
+  padding: 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+.sidebar-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  margin-bottom: 0.5rem;
+}
+.sidebar-footer {
+  margin-top: auto;
+  padding: 0.75rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+/* ── Panel 2: Center (species) ── */
+.panel-center {
+  flex: 1;
+  overflow-y: auto;
+  background: #fafafa;
+  position: relative;
+}
+.panel-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 4rem 1rem;
+}
+/* ── Route info bar ── */
+.route-info-bar {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+/* ── Filters bar ── */
+.filters-bar {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 10;
+}
+.filters-row {
+  display: flex;
+  gap: 0.375rem;
+  margin-bottom: 0.375rem;
+}
+.filter-select {
+  flex: 1;
+  padding: 0.25rem 0.375rem;
+  font-size: 0.6875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+.filter-select:focus {
+  outline: none;
+  ring: 1px solid #111827;
+}
+.species-grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+/* ── Panel 3: Map ── */
+.panel-map {
+  width: 50%;
+  min-width: 280px;
+  flex-shrink: 0;
+  position: relative;
+  border-left: 1px solid #f3f4f6;
+}
+#map {
+  z-index: 0;
+}
+
+/* ── Tabs ── */
 .tab-btn {
   color: #9ca3af;
   background: transparent;
@@ -17,140 +152,180 @@ body {
   color: #6b7280;
 }
 
-/* Species taxa section */
-.taxa-section {
-  margin-bottom: 2.5rem;
-}
-.taxa-header {
+/* ── Taxa filter toggle ── */
+.taxa-toggle {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.375rem;
   cursor: pointer;
-  padding: 0.5rem 0;
   user-select: none;
-  min-height: 44px;
+  transition: opacity 0.15s;
 }
-.taxa-header h3 {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #374151;
+.taxa-toggle:hover {
+  background: #f3f4f6;
 }
-.taxa-header .count {
-  font-size: 0.75rem;
-  color: #9ca3af;
+.taxa-toggle.active {
+  background: #f3f4f6;
+  font-weight: 500;
 }
-.taxa-chevron {
-  width: 1rem;
-  height: 1rem;
-  color: #9ca3af;
-  transition: transform 0.2s ease;
+.taxa-toggle.off {
+  opacity: 0.3;
+}
+.taxa-toggle-icon {
+  width: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  color: #9ca3af;
+  font-size: 11px;
 }
-.taxa-section.open .taxa-chevron {
-  transform: rotate(90deg);
+.taxa-toggle-label {
+  font-size: 0.6875rem;
+  color: #374151;
+  flex: 1;
 }
-.taxa-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 1rem;
-  padding-top: 0.75rem;
-}
-.taxa-grid.collapsed {
-  display: none;
+.taxa-toggle-count {
+  font-size: 0.625rem;
+  color: #d1d5db;
 }
 
-/* Species card */
+/* ── Species card (grid tile) ── */
 .species-card {
-  border: 1px solid #f3f4f6;
-  border-radius: 0.75rem;
+  border: 1px solid #f0f0f0;
+  border-radius: 0.625rem;
   overflow: hidden;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   position: relative;
 }
 .species-card:hover {
   border-color: #e5e7eb;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
 }
-.species-card a {
-  text-decoration: none;
-  color: inherit;
+.species-card.selected {
+  border-color: #111827;
+  box-shadow: 0 0 0 1px #111827;
+}
+.species-card-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #f3f4f6;
   display: block;
 }
-.species-card img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  background: #f9fafb;
-}
-.species-card .info {
-  padding: 0.625rem 0.75rem;
-  position: relative;
+.species-card-body {
+  padding: 0.5rem 0.625rem 0.375rem;
 }
 .species-card .common-name {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 500;
   color: #111827;
   line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.species-card .sci-name {
-  font-size: 0.6875rem;
-  font-style: italic;
-  color: #9ca3af;
-  margin-top: 0.125rem;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.species-card .obs-count {
+.species-card .sci-name {
   font-size: 0.625rem;
-  color: #d1d5db;
-  margin-top: 0.25rem;
+  font-style: italic;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-
-/* Map-link button on species card */
-.map-link-btn {
-  display: inline-flex;
+.species-card-footer {
+  display: flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.375rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.6875rem;
-  color: #6b7280;
-  background: #f3f4f6;
-  border: none;
-  cursor: pointer;
+  justify-content: space-between;
+  padding: 0 0.625rem 0.5rem;
+}
+.species-card .obs-count {
+  font-size: 0.5625rem;
+  color: #d1d5db;
+}
+.species-card .inat-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 0.25rem;
+  color: #d1d5db;
   transition: color 0.15s, background 0.15s;
 }
-.map-link-btn:hover {
-  color: #111827;
-  background: #e5e7eb;
+.species-card .inat-link:hover {
+  color: #6b7280;
+  background: #f3f4f6;
 }
 
-/* Map */
-#map {
-  z-index: 0;
+/* Conservation badge */
+.conservation-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.5rem;
+  font-weight: 600;
+  padding: 0.0625rem 0.25rem;
+  border-radius: 0.1875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  margin-left: 0.25rem;
+}
+.conservation-badge.lc { background: #dcfce7; color: #166534; }
+.conservation-badge.nt { background: #fef9c3; color: #854d0e; }
+.conservation-badge.vu { background: #ffedd5; color: #9a3412; }
+.conservation-badge.en { background: #fee2e2; color: #991b1b; }
+.conservation-badge.cr { background: #fecaca; color: #7f1d1d; }
+
+/* ── Tooltip (Wikipedia summary on hover) ── */
+.species-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  padding: 0.625rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.species-card:hover .species-tooltip {
+  opacity: 1;
+}
+.species-tooltip p {
+  font-size: 0.6875rem;
+  color: #6b7280;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
 }
 
-/* Observation map controls */
+/* ── Map controls ── */
 .obs-controls {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
 }
-
 .obs-toggle-btn {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
   font-family: inherit;
   color: #374151;
   cursor: pointer;
@@ -164,128 +339,213 @@ body {
   display: none;
 }
 
-/* Observation marker */
+/* ── Observation marker ── */
 .obs-marker {
   background: none !important;
   border: none !important;
 }
+.obs-marker-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #d1d5db;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #374151;
+  line-height: 1;
+}
 
-/* Observation popup */
+/* ── Observation popup ── */
 .obs-popup-container .leaflet-popup-content-wrapper {
-  border-radius: 0.75rem;
+  border-radius: 0.625rem;
   padding: 0;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 .obs-popup-container .leaflet-popup-content {
   margin: 0;
-  min-width: 200px;
+  min-width: 180px;
 }
 .obs-popup-container .leaflet-popup-tip {
   box-shadow: none;
 }
 .obs-popup {
   display: flex;
-  gap: 0;
 }
 .obs-popup img {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   object-fit: cover;
   flex-shrink: 0;
 }
 .obs-popup-info {
-  padding: 0.5rem 0.75rem;
+  padding: 0.375rem 0.625rem;
   min-width: 0;
 }
 .obs-popup-name {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #111827;
   text-decoration: none;
   display: block;
   line-height: 1.3;
 }
-.obs-popup-name:hover {
-  text-decoration: underline;
-}
+.obs-popup-name:hover { text-decoration: underline; }
 .obs-popup-sci {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-style: italic;
   color: #9ca3af;
 }
 .obs-popup-meta {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: #9ca3af;
-  margin-top: 0.125rem;
 }
 .obs-popup-link {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: #3b82f6;
   text-decoration: none;
-  margin-top: 0.25rem;
+  margin-top: 0.125rem;
   display: inline-block;
 }
-.obs-popup-link:hover {
-  text-decoration: underline;
-}
+.obs-popup-link:hover { text-decoration: underline; }
 
-/* MarkerCluster overrides for clean look */
+/* ── MarkerCluster overrides ── */
 .marker-cluster-small,
 .marker-cluster-medium,
 .marker-cluster-large {
-  background: rgba(59, 130, 246, 0.15) !important;
+  background: rgba(107, 114, 128, 0.12) !important;
 }
 .marker-cluster-small div,
 .marker-cluster-medium div,
 .marker-cluster-large div {
-  background: rgba(59, 130, 246, 0.6) !important;
+  background: rgba(55, 65, 81, 0.65) !important;
   color: #fff !important;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 
-/* Territory pills */
+/* ── Territory pills ── */
 .territory-link {
   display: inline-block;
-  padding: 0.25rem 0.75rem;
-  margin: 0.125rem;
-  font-size: 0.75rem;
+  padding: 0.0625rem 0.375rem;
+  margin: 0.0625rem 0;
+  font-size: 0.5625rem;
   border: 1px solid #e5e7eb;
   border-radius: 9999px;
   color: #6b7280;
   text-decoration: none;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s, color 0.15s;
 }
 .territory-link:hover {
   background: #f3f4f6;
   color: #111827;
 }
 
-/* Recent activities list */
+/* ── Recent activities ── */
 #activities-list {
-  max-height: 20rem;
-  overflow-y: auto;
+  max-height: 10rem;
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* Skeleton placeholder */
-.species-card img[src=""] {
+/* ── Leaflet Draw overrides ── */
+.leaflet-draw-toolbar a {
+  background-size: 300px 30px;
+}
+
+/* ── Mobile ── */
+.mobile-only { display: none; }
+.mobile-map-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 0.5rem;
   background: #f3f4f6;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+.mobile-map-btn:hover { background: #e5e7eb; }
+.mobile-map-close {
+  display: none;
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1000;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  color: #374151;
 }
 
-/* ── Mobile responsive ── */
-@media (max-width: 639px) {
-  .taxa-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.75rem;
+@media (max-width: 768px) {
+  .app-shell { flex-direction: column; }
+
+  .sidebar {
+    width: 100%;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid #f3f4f6;
+    flex-shrink: 0;
+  }
+  .sidebar-scroll {
+    max-height: 40vh;
   }
 
-  .obs-popup {
-    flex-direction: column;
+  .panel-center { flex: 1; }
+  .species-grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
-  .obs-popup img {
+
+  .panel-map {
+    display: none;
+    position: fixed;
+    top: 44px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
     width: 100%;
-    height: 120px;
+    min-width: 0;
+    border-left: none;
   }
+  .panel-map.mobile-open { display: block; }
+  .mobile-only { display: block; }
+  .mobile-map-close { display: flex; }
+
+  .obs-popup { flex-direction: column; }
+  .obs-popup img { width: 100%; height: 100px; }
+  .species-tooltip { display: none; }
+}
+
+/* ── Scrollbar ── */
+.sidebar-scroll::-webkit-scrollbar,
+.panel-center::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-track,
+.panel-center::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.panel-center::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 2px;
 }
