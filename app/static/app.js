@@ -47,7 +47,8 @@
   const filtersSection = $("#filters-section");
   const taxaSection = $("#taxa-section");
   const taxaFiltersEl = $("#taxa-filters");
-  const mobileMapSection = $("#mobile-map-section");
+  const mobileTaxaRow = $("#mobile-taxa-row");
+  const mobileFetchToggle = $("#mobile-fetch-toggle");
 
   // ── Taxa Font Awesome icon classes ──
   const TAXA_ICON_CLASSES = {
@@ -203,19 +204,42 @@
     });
   });
 
-  // ── Mobile map ──
-  const mobileMapToggle = $("#mobile-map-toggle");
-  const mobileMapClose = $("#mobile-map-close");
-  if (mobileMapToggle) {
-    mobileMapToggle.addEventListener("click", () => {
-      panelMap.classList.add("mobile-open");
-      if (leafletMap) setTimeout(() => leafletMap.invalidateSize(), 100);
+  // ── Mobile sidebar dropdown ──
+  let mobileBackdrop = null;
+
+  function closeMobileSidebar() {
+    const sidebar = $("#sidebar");
+    sidebar.classList.remove("mobile-expanded");
+    mobileFetchToggle.classList.remove("open");
+    if (mobileBackdrop) { mobileBackdrop.remove(); mobileBackdrop = null; }
+  }
+
+  function openMobileSidebar() {
+    const sidebar = $("#sidebar");
+    sidebar.classList.add("mobile-expanded");
+    mobileFetchToggle.classList.add("open");
+    if (!mobileBackdrop) {
+      mobileBackdrop = document.createElement("div");
+      mobileBackdrop.className = "mobile-sidebar-backdrop";
+      mobileBackdrop.addEventListener("click", closeMobileSidebar);
+      document.body.appendChild(mobileBackdrop);
+    }
+  }
+
+  if (mobileFetchToggle) {
+    mobileFetchToggle.addEventListener("click", () => {
+      const sidebar = $("#sidebar");
+      if (sidebar.classList.contains("mobile-expanded")) {
+        closeMobileSidebar();
+      } else {
+        openMobileSidebar();
+      }
     });
   }
-  if (mobileMapClose) {
-    mobileMapClose.addEventListener("click", () => {
-      panelMap.classList.remove("mobile-open");
-    });
+
+  const mobileSidebarClose = $("#mobile-sidebar-close");
+  if (mobileSidebarClose) {
+    mobileSidebarClose.addEventListener("click", closeMobileSidebar);
   }
 
   // ── Helpers ──
@@ -270,6 +294,7 @@
     const url = activityUrl.value.trim();
     if (!url) return;
     hideError();
+    closeMobileSidebar();
     showLoading("Fetching route from Strava...");
 
     try {
@@ -295,6 +320,7 @@
     const file = e.target.files[0];
     if (!file) return;
     hideError();
+    closeMobileSidebar();
     showLoading("Processing GPX...");
 
     const formData = new FormData();
@@ -329,8 +355,12 @@
     // Sidebar sections
     routeInfoEl.classList.remove("hidden");
     taxaSection.classList.remove("hidden");
-    mobileMapSection.classList.remove("hidden");
     routeNameEl.textContent = routeData.name;
+
+    // Mobile: collapse sidebar, show map
+    document.body.classList.add("route-loaded");
+    closeMobileSidebar();
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 200);
 
     renderMap(routeData.coords, routeData.bbox);
     fetchTerritories(routeData.bbox);
@@ -373,55 +403,88 @@
   // ── Taxa filter rendering ──
   let allTaxaKeys = [];
 
+  function handleTaxaClick(taxa) {
+    if (taxa === "__all__") {
+      activeTaxa = new Set(allTaxaKeys);
+    } else {
+      const isOnlyActive = activeTaxa.size === 1 && activeTaxa.has(taxa);
+      activeTaxa = isOnlyActive ? new Set(allTaxaKeys) : new Set([taxa]);
+    }
+    updateTaxaToggleStyles();
+    renderSpeciesCards();
+  }
+
   function renderTaxaFilters(speciesByTaxa) {
     taxaFiltersEl.innerHTML = "";
+    mobileTaxaRow.innerHTML = "";
     allTaxaKeys = Object.keys(speciesByTaxa).filter((t) => speciesByTaxa[t].length > 0);
     activeTaxa = new Set(allTaxaKeys);
 
-    // "All" button
+    const totalCount = allTaxaKeys.reduce((sum, t) => sum + speciesByTaxa[t].length, 0);
+
+    // Desktop "All" button
     const allBtn = document.createElement("div");
     allBtn.className = "taxa-toggle active";
     allBtn.dataset.taxa = "__all__";
     allBtn.innerHTML = `
       <span class="taxa-toggle-icon" style="color:#374151"><svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg></span>
       <span class="taxa-toggle-label">All</span>
-      <span class="taxa-toggle-count">${allTaxaKeys.reduce((sum, t) => sum + speciesByTaxa[t].length, 0)}</span>
+      <span class="taxa-toggle-count">${totalCount}</span>
     `;
-    allBtn.addEventListener("click", () => {
-      activeTaxa = new Set(allTaxaKeys);
-      updateTaxaToggleStyles();
-      renderSpeciesCards();
-    });
+    allBtn.addEventListener("click", () => handleTaxaClick("__all__"));
     taxaFiltersEl.appendChild(allBtn);
+
+    // Mobile "All" pill
+    const mAllPill = document.createElement("span");
+    mAllPill.className = "mobile-taxa-pill active";
+    mAllPill.dataset.taxa = "__all__";
+    mAllPill.textContent = `All (${totalCount})`;
+    mAllPill.addEventListener("click", () => handleTaxaClick("__all__"));
+    mobileTaxaRow.appendChild(mAllPill);
 
     for (const taxa of allTaxaKeys) {
       const count = speciesByTaxa[taxa].length;
+      const iconClass = TAXA_ICON_CLASSES[taxa] || "fa-solid fa-circle";
+      const label = TAXA_LABELS[taxa] || taxa;
 
+      // Desktop sidebar toggle
       const toggle = document.createElement("div");
       toggle.className = "taxa-toggle";
       toggle.dataset.taxa = taxa;
       toggle.innerHTML = `
-        <span class="taxa-toggle-icon"><i class="${TAXA_ICON_CLASSES[taxa] || 'fa-solid fa-circle'}"></i></span>
-        <span class="taxa-toggle-label">${TAXA_LABELS[taxa] || taxa}</span>
+        <span class="taxa-toggle-icon"><i class="${iconClass}"></i></span>
+        <span class="taxa-toggle-label">${label}</span>
         <span class="taxa-toggle-count">${count}</span>
       `;
-      toggle.addEventListener("click", () => {
-        const isOnlyActive = activeTaxa.size === 1 && activeTaxa.has(taxa);
-        if (isOnlyActive) {
-          activeTaxa = new Set(allTaxaKeys);
-        } else {
-          activeTaxa = new Set([taxa]);
-        }
-        updateTaxaToggleStyles();
-        renderSpeciesCards();
-      });
+      toggle.addEventListener("click", () => handleTaxaClick(taxa));
       taxaFiltersEl.appendChild(toggle);
+
+      // Mobile pill
+      const pill = document.createElement("span");
+      pill.className = "mobile-taxa-pill";
+      pill.dataset.taxa = taxa;
+      pill.innerHTML = `<i class="${iconClass}"></i> ${label}`;
+      pill.addEventListener("click", () => handleTaxaClick(taxa));
+      mobileTaxaRow.appendChild(pill);
     }
   }
 
   function updateTaxaToggleStyles() {
     const showingAll = activeTaxa.size === allTaxaKeys.length;
+
+    // Desktop toggles
     taxaFiltersEl.querySelectorAll(".taxa-toggle").forEach((el) => {
+      const t = el.dataset.taxa;
+      if (t === "__all__") {
+        el.classList.toggle("active", showingAll);
+      } else {
+        el.classList.toggle("active", activeTaxa.has(t));
+        el.classList.toggle("off", !activeTaxa.has(t));
+      }
+    });
+
+    // Mobile pills
+    mobileTaxaRow.querySelectorAll(".mobile-taxa-pill").forEach((el) => {
       const t = el.dataset.taxa;
       if (t === "__all__") {
         el.classList.toggle("active", showingAll);
@@ -541,12 +604,9 @@
         if (selectedCardEl) selectedCardEl.classList.remove("selected");
         card.classList.add("selected");
         selectedCardEl = card;
-        if (sp.id) {
-          focusSpeciesOnMap(sp.id);
-          if (window.innerWidth <= 768) {
-            panelMap.classList.add("mobile-open");
-            setTimeout(() => leafletMap && leafletMap.invalidateSize(), 100);
-          }
+        if (sp.id) focusSpeciesOnMap(sp.id);
+        if (window.innerWidth <= 768) {
+          window.scrollTo({ top: 0, behavior: "smooth" });
         }
       });
 

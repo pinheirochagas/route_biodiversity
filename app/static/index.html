@@ -46,6 +46,7 @@
 
     <!-- PANEL 1: Sidebar -->
     <aside class="sidebar" id="sidebar">
+      <button id="mobile-sidebar-close" class="mobile-sidebar-close" type="button" onclick="document.getElementById('sidebar').classList.remove('mobile-expanded');document.querySelector('.mobile-fetch-toggle').classList.remove('open');var bd=document.querySelector('.mobile-sidebar-backdrop');if(bd)bd.remove();">&times; Close</button>
       <div class="sidebar-scroll">
 
         <!-- Route Input -->
@@ -100,19 +101,10 @@
           <div id="territories" class="mt-1"></div>
         </div>
 
-
-        <!-- Taxa filters (shown after load) -->
+        <!-- Taxa filters (shown after load) — desktop only -->
         <div id="taxa-section" class="sidebar-section hidden">
           <div class="sidebar-label">Taxa</div>
           <div id="taxa-filters" class="space-y-0.5"></div>
-        </div>
-
-        <!-- Map controls for mobile -->
-        <div id="mobile-map-section" class="sidebar-section mobile-only hidden">
-          <button id="mobile-map-toggle" class="mobile-map-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z" clip-rule="evenodd"/></svg>
-            Show Map
-          </button>
         </div>
 
         <!-- Footer -->
@@ -137,9 +129,12 @@
         <span id="territories-top" class="text-[10px] text-gray-400"></span>
       </div>
 
-      <!-- Filters bar (dropdowns only) -->
+      <!-- Filters bar -->
       <div id="filters-section" class="filters-bar hidden">
         <div class="filters-row">
+          <button id="mobile-fetch-toggle" class="mobile-fetch-toggle" type="button">
+            Fetch route <span class="mobile-fetch-arrow">&#9662;</span>
+          </button>
           <select id="month-select" class="filter-select">
             <option value="0">Year-round</option>
             <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
@@ -157,6 +152,7 @@
             <option value="name">A &rarr; Z</option>
           </select>
         </div>
+        <div id="mobile-taxa-row" class="mobile-taxa-row"></div>
       </div>
 
       <!-- Loading -->
@@ -197,11 +193,6 @@
     <!-- PANEL 3: Map -->
     <div class="panel-map" id="panel-map">
       <div id="map" class="w-full h-full"></div>
-      <button id="mobile-map-close" class="mobile-map-close">
-        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-        </svg>
-      </button>
     </div>
 
   </div>

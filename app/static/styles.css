@@ -103,7 +103,6 @@ body {
 .filters-row {
   display: flex;
   gap: 0.375rem;
-  margin-bottom: 0.375rem;
 }
 .filter-select {
   flex: 1;
@@ -458,84 +457,175 @@ body {
   background-size: 300px 30px;
 }
 
-/* ── Mobile ── */
-.mobile-only { display: none; }
-.mobile-map-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-  width: 100%;
-  padding: 0.5rem;
-  background: #f3f4f6;
-  border: none;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
-  font-family: inherit;
-  font-weight: 500;
-  color: #374151;
-  cursor: pointer;
-}
-.mobile-map-btn:hover { background: #e5e7eb; }
-.mobile-map-close {
+/* ── Mobile sidebar close (hidden on desktop) ── */
+.mobile-sidebar-close {
   display: none;
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 1000;
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  color: #374151;
+}
+
+/* ── Mobile fetch-route toggle (hidden on desktop) ── */
+.mobile-fetch-toggle {
+  display: none;
+}
+
+/* ── Mobile taxa row (hidden on desktop) ── */
+.mobile-taxa-row {
+  display: none;
 }
 
 @media (max-width: 768px) {
-  .app-shell { flex-direction: column; }
+  body {
+    overflow: auto;
+  }
+  .app-shell {
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 44px);
+  }
 
+  /* ── Sidebar: visible before route loaded, hidden after ── */
   .sidebar {
     width: 100%;
     max-height: none;
     border-right: none;
     border-bottom: 1px solid #f3f4f6;
     flex-shrink: 0;
+    order: 1;
   }
   .sidebar-scroll {
     max-height: 60vh;
   }
-
-  .panel-center { flex: 1; }
-  .species-grid-container {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-
-  .panel-map {
+  body.route-loaded .sidebar {
     display: none;
+  }
+  body.route-loaded .sidebar.mobile-expanded {
+    display: flex;
     position: fixed;
     top: 44px;
     left: 0;
     right: 0;
-    bottom: 0;
-    z-index: 40;
+    z-index: 45;
+    max-height: 70vh;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  /* ── Mobile sidebar close button ── */
+  .mobile-sidebar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 500;
+    background: #f3f4f6;
+    border: none;
+    border-bottom: 1px solid #e5e7eb;
+    color: #374151;
+    cursor: pointer;
+  }
+  .mobile-sidebar-close:hover { background: #e5e7eb; }
+
+  /* Hide sidebar taxa section on mobile (taxa go in filters bar) */
+  #taxa-section { display: none !important; }
+
+  /* Hide route-info-bar on mobile (saves space) */
+  .route-info-bar { display: none !important; }
+
+  /* ── Map: always visible after route loaded ── */
+  .panel-map {
+    display: none;
+    order: 2;
     width: 100%;
     min-width: 0;
+    height: 35vh;
+    flex-shrink: 0;
     border-left: none;
   }
-  .panel-map.mobile-open { display: block; }
-  .mobile-only { display: block; }
-  .mobile-map-close { display: flex; }
+  body.route-loaded .panel-map {
+    display: block;
+  }
 
-  #mobile-map-section {
-    position: sticky;
-    bottom: 0;
+  /* ── Center: species + filters ── */
+  .panel-center {
+    order: 3;
+    flex: 1;
+    min-height: 0;
+  }
+  .species-grid-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* ── Mobile "Fetch route" button in filters row ── */
+  .mobile-fetch-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.6875rem;
+    font-family: inherit;
+    font-weight: 500;
+    border: none;
+    border-radius: 0.375rem;
+    background: #111827;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .mobile-fetch-toggle:hover { background: #374151; }
+  .mobile-fetch-arrow {
+    font-size: 0.5rem;
+    transition: transform 0.15s;
+  }
+  .mobile-fetch-toggle.open .mobile-fetch-arrow {
+    transform: rotate(180deg);
+  }
+
+  /* ── Mobile taxa row (wrapping pills) ── */
+  .mobile-taxa-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.375rem;
+  }
+  .mobile-taxa-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1875rem 0.5rem;
+    font-size: 0.625rem;
+    font-family: inherit;
+    border: 1px solid #e5e7eb;
+    border-radius: 9999px;
     background: #fff;
-    border-top: 1px solid #f3f4f6;
-    z-index: 5;
+    color: #6b7280;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .mobile-taxa-pill:hover { background: #f3f4f6; }
+  .mobile-taxa-pill.active {
+    background: #111827;
+    color: #fff;
+    border-color: #111827;
+  }
+  .mobile-taxa-pill.off {
+    opacity: 0.35;
+  }
+  .mobile-taxa-pill i {
+    font-size: 0.5625rem;
+  }
+
+  /* ── Sidebar overlay backdrop ── */
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    top: 44px;
+    z-index: 44;
+    background: rgba(0, 0, 0, 0.2);
   }
 
   .obs-popup { flex-direction: column; }
