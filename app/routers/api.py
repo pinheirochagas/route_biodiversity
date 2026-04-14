@@ -37,15 +37,17 @@ def _require_strava(request: Request) -> dict:
 
 
 async def _ensure_athlete_id(request: Request, strava: dict) -> str:
-    """Resolve athlete_id if missing from session, and kick off cache build."""
+    """Resolve athlete_id if missing from session, and kick off cache build/refresh."""
     athlete_id = strava.get("athlete_id", "")
     if not athlete_id:
         athlete_id = await fetch_athlete_id(strava["access_token"])
         strava["athlete_id"] = athlete_id
         request.session["strava"] = strava
-    if athlete_id and not is_cache_ready(athlete_id):
+    if athlete_id:
         asyncio.create_task(
-            build_full_activity_cache(strava["access_token"], athlete_id)
+            build_full_activity_cache(
+                strava["access_token"], athlete_id, force=is_cache_ready(athlete_id)
+            )
         )
     return athlete_id
 

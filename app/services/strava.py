@@ -72,9 +72,11 @@ def _format_activity(a: dict) -> dict:
 
 # ── Activity cache ──
 
-async def build_full_activity_cache(access_token: str, athlete_id: str) -> None:
+async def build_full_activity_cache(access_token: str, athlete_id: str, force: bool = False) -> None:
     """Fetch last 6 months of activities from Strava and cache them."""
     if athlete_id in _cache_building:
+        return
+    if not force and athlete_id in _activity_cache:
         return
     _cache_building.add(athlete_id)
     after = int((datetime.now() - timedelta(days=180)).timestamp())
