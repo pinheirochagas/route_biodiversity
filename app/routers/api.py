@@ -185,11 +185,13 @@ async def get_observations(body: dict):
 
 
 @router.post("/territories")
-async def get_territories(body: dict):
+async def get_territories(body: dict, settings: Settings = Depends(get_settings)):
     bbox = body.get("bbox")
     if not bbox or len(bbox) != 4:
         raise HTTPException(400, "bbox must be [swlat, swlng, nelat, nelng]")
 
-    territories = await fetch_indigenous_territories(tuple(bbox))
+    territories = await fetch_indigenous_territories(
+        tuple(bbox), api_key=settings.native_land_api_key
+    )
     country = await identify_country(tuple(bbox))
     return {"territories": territories, "country": country}

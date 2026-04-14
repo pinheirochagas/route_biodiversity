@@ -128,13 +128,16 @@ async def identify_country(bbox: tuple) -> str | None:
     return None
 
 
-async def fetch_indigenous_territories(bbox: tuple) -> list[dict]:
+async def fetch_indigenous_territories(bbox: tuple, api_key: str = "") -> list[dict]:
     lat, lng = bbox_center(bbox)
+    params = {
+        "maps": "territories",
+        "position": f"{lat},{lng}",
+    }
+    if api_key:
+        params["key"] = api_key
     async with httpx.AsyncClient() as client:
-        resp = await client.get(NATIVE_LAND_URL, params={
-            "maps": "territories",
-            "position": f"{lat},{lng}",
-        })
+        resp = await client.get(NATIVE_LAND_URL, params=params)
         if resp.status_code != 200:
             return []
         territories = resp.json()

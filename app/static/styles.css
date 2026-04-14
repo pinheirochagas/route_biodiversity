@@ -530,8 +530,11 @@ body {
   /* Hide sidebar taxa section on mobile (taxa go in filters bar) */
   #taxa-section { display: none !important; }
 
-  /* Hide route-info-bar on mobile (saves space) */
-  .route-info-bar { display: none !important; }
+  /* Compact route-info-bar on mobile */
+  .route-info-bar {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.5625rem;
+  }
 
   /* ── Map: always visible after route loaded ── */
   .panel-map {

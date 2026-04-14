@@ -384,15 +384,18 @@
         routeCountry.textContent = data.country;
         if (countryTop) countryTop.textContent = data.country;
       }
+      const nativeLandUrl = `https://native-land.ca/maps?position=${((bbox[0]+bbox[2])/2).toFixed(4)},${((bbox[1]+bbox[3])/2).toFixed(4)},11`;
       if (data.territories && data.territories.length) {
         const links = data.territories
           .map((t) => `<a href="${t.url}" target="_blank" class="territory-link">${t.name}</a>`)
           .join(" ");
-        territoriesEl.innerHTML = links;
-        if (terrTop) terrTop.innerHTML = links;
+        const prefix = '<span style="font-size:10px;color:#6b7280;font-weight:500">Native Land: </span>';
+        territoriesEl.innerHTML = prefix + links;
+        if (terrTop) terrTop.innerHTML = prefix + links;
       } else {
-        territoriesEl.innerHTML = "";
-        if (terrTop) terrTop.innerHTML = "";
+        const fallback = `<a href="${nativeLandUrl}" target="_blank" class="territory-link">Explore on Native Land &rarr;</a>`;
+        territoriesEl.innerHTML = fallback;
+        if (terrTop) terrTop.innerHTML = fallback;
       }
     } catch (_) {
       territoriesEl.innerHTML = "";

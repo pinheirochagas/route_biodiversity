@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     strava_client_secret: str
     base_url: str = "http://localhost:8000"
     session_secret: str = "change-me-in-production"
+    native_land_api_key: str = ""
 
     @property
     def strava_redirect_uri(self) -> str:
