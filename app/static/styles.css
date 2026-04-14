@@ -509,8 +509,11 @@ body {
     border-bottom: 1px solid #e5e7eb;
   }
 
-  /* ── Mobile sidebar close button ── */
+  /* ── Mobile sidebar close button (only in overlay mode) ── */
   .mobile-sidebar-close {
+    display: none;
+  }
+  .sidebar.mobile-expanded .mobile-sidebar-close {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -525,7 +528,7 @@ body {
     color: #374151;
     cursor: pointer;
   }
-  .mobile-sidebar-close:hover { background: #e5e7eb; }
+  .sidebar.mobile-expanded .mobile-sidebar-close:hover { background: #e5e7eb; }
 
   /* Hide sidebar taxa section on mobile (taxa go in filters bar) */
   #taxa-section { display: none !important; }
