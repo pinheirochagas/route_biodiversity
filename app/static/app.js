@@ -26,6 +26,7 @@
   let geologyEnabled = true;
   let geologyData = [];
   let geologyTileLayer = null;
+  let activeGeoClass = null;
   let routeLocation = { city: "", state: "", country: "" };
 
   const $ = (sel) => document.querySelector(sel);
@@ -483,6 +484,7 @@
     ebirdSpeciesData = {};
     allEbirdObservations = [];
     geologyData = [];
+    activeGeoClass = null;
 
     for (const src of ["inat", "gbif", "ebird", "geology"]) {
       const toggle = $(`[data-source="${src}"]`);
@@ -842,14 +844,12 @@
   }
 
   // ── Geology rendering ──
-  function renderGeologyInfo(formations) {
-    const el = $("#geology-info");
-    if (!el) return;
-    if (!geologyEnabled || !formations || !formations.length) {
-      el.innerHTML = "";
-      return;
-    }
+  const GEO_CLASS_LABELS = { igneous: "Igneous", sedimentary: "Sedimentary", metamorphic: "Metamorphic", mineral: "Mineral", other: "Other" };
+  const GEO_CLASS_ICONS = { igneous: "fa-fire", sedimentary: "fa-layer-group", metamorphic: "fa-diamond", mineral: "fa-gem", other: "fa-circle" };
+  const GEO_CLASS_COLORS = { igneous: "#c0392b", sedimentary: "#d4a017", metamorphic: "#7d5a50", mineral: "#4338ca", other: "#6b7280" };
+  const GEO_CLASS_ORDER = ["igneous", "sedimentary", "metamorphic", "mineral", "other"];
 
+  function getGeologyGroups(formations) {
     const groups = {};
     for (const f of formations) {
       if (f.all_terms && f.all_terms.length) {
@@ -864,20 +864,73 @@
         if (f.lith_term) groups[cls].add(f.lith_term);
       }
     }
+    return groups;
+  }
 
-    const classLabels = { sedimentary: "Sedimentary", igneous: "Igneous", metamorphic: "Metamorphic", mineral: "Mineral", other: "Other" };
-    const classIcons = { sedimentary: "fa-layer-group", igneous: "fa-fire", metamorphic: "fa-diamond", mineral: "fa-gem", other: "fa-circle" };
-    const classColors = { sedimentary: "#d4a017", igneous: "#c0392b", metamorphic: "#7d5a50", mineral: "#4338ca", other: "#6b7280" };
-
-    let html = '<span style="font-size:10px;color:#6b7280;font-weight:500"><i class="fa-solid fa-mountain" style="color:#a3724e;margin-right:2px"></i> Geology: </span>';
-    const parts = [];
-    for (const cls of ["sedimentary", "igneous", "metamorphic", "mineral", "other"]) {
-      if (!groups[cls] || groups[cls].size === 0) continue;
-      const rocks = [...groups[cls]].join(", ");
-      parts.push(`<span style="font-size:10px"><span style="color:${classColors[cls]};font-weight:600"><i class="fa-solid ${classIcons[cls]}" style="font-size:8px;margin-right:1px"></i> ${classLabels[cls]}:</span> <span style="color:#6b7280">${rocks}</span></span>`);
+  function handleGeoClassClick(cls) {
+    const gallery = $("#geology-gallery");
+    if (cls === "__all__") {
+      activeGeoClass = null;
+      geologyGalleryOpen = !geologyGalleryOpen;
+      if (gallery) gallery.classList.toggle("hidden", !geologyGalleryOpen);
+      if (geologyGalleryOpen) renderGeologyGallery(geologyData);
+      const allPill = gallery && gallery.parentElement && gallery.parentElement.querySelector('.geo-class-pill[data-cls="__all__"]');
+      if (allPill) allPill.classList.toggle("active", geologyGalleryOpen);
+      return;
     }
-    const chevron = '<i class="fa-solid fa-chevron-down" style="font-size:8px;color:#d1d5db;margin-left:4px;transition:transform 0.2s" id="geology-chevron"></i>';
-    el.innerHTML = html + parts.join(' <span style="color:#d1d5db">|</span> ') + chevron;
+    activeGeoClass = activeGeoClass === cls ? null : cls;
+    updateGeoClassStyles();
+    if (!geologyGalleryOpen) {
+      geologyGalleryOpen = true;
+      if (gallery) gallery.classList.remove("hidden");
+    }
+    renderGeologyGallery(geologyData);
+  }
+
+  function updateGeoClassStyles() {
+    const pills = $$("#geology-info .geo-class-pill");
+    pills.forEach((el) => {
+      const cls = el.dataset.cls;
+      if (cls === "__all__") {
+        el.classList.toggle("active", geologyGalleryOpen && activeGeoClass === null);
+      } else {
+        el.classList.toggle("active", activeGeoClass === cls);
+        el.classList.toggle("off", activeGeoClass !== null && activeGeoClass !== cls);
+      }
+    });
+  }
+
+  function renderGeologyInfo(formations) {
+    const el = $("#geology-info");
+    if (!el) return;
+    if (!geologyEnabled || !formations || !formations.length) {
+      el.innerHTML = "";
+      return;
+    }
+
+    const groups = getGeologyGroups(formations);
+    let totalCount = 0;
+    for (const cls of GEO_CLASS_ORDER) {
+      if (groups[cls]) totalCount += groups[cls].size;
+    }
+
+    let html = '<div class="geo-class-filters">';
+    html += `<span class="geo-class-pill" data-cls="__all__"><i class="fa-solid fa-mountain"></i> Geomaterials <span class="geo-pill-count">${totalCount}</span></span>`;
+
+    for (const cls of GEO_CLASS_ORDER) {
+      if (!groups[cls] || groups[cls].size === 0) continue;
+      const count = groups[cls].size;
+      html += `<span class="geo-class-pill" data-cls="${cls}" style="--geo-color:${GEO_CLASS_COLORS[cls]}"><i class="fa-solid ${GEO_CLASS_ICONS[cls]}"></i> ${GEO_CLASS_LABELS[cls]} <span class="geo-pill-count">${count}</span></span>`;
+    }
+    html += "</div>";
+    el.innerHTML = html;
+
+    el.querySelectorAll(".geo-class-pill").forEach((pill) => {
+      pill.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleGeoClassClick(pill.dataset.cls);
+      });
+    });
   }
 
   let geologyGalleryOpen = false;
@@ -887,8 +940,6 @@
     if (!gallery) return;
     geologyGalleryOpen = !geologyGalleryOpen;
     gallery.classList.toggle("hidden", !geologyGalleryOpen);
-    const chevron = $("#geology-chevron");
-    if (chevron) chevron.style.transform = geologyGalleryOpen ? "rotate(180deg)" : "";
     if (geologyGalleryOpen) renderGeologyGallery(geologyData);
   }
 
@@ -896,8 +947,6 @@
     const gallery = $("#geology-gallery");
     if (!gallery || !formations || !formations.length) return;
     gallery.innerHTML = "";
-
-    const classColors = { sedimentary: "#d4a017", igneous: "#c0392b", metamorphic: "#7d5a50", mineral: "#4338ca", other: "#6b7280" };
 
     const seen = new Set();
     const rocks = [];
@@ -942,10 +991,19 @@
       }
     }
 
-    for (const r of rocks) {
+    const filtered = activeGeoClass
+      ? rocks.filter((r) => (r.lith_class || "other") === activeGeoClass)
+      : rocks;
+
+    if (!filtered.length) {
+      gallery.innerHTML = '<div style="padding:12px;color:#9ca3af;font-size:11px;text-align:center">No rocks in this category</div>';
+      return;
+    }
+
+    for (const r of filtered) {
       const card = document.createElement("div");
       card.className = "geology-card";
-      const clsColor = classColors[r.lith_class] || "#6b7280";
+      const clsColor = GEO_CLASS_COLORS[r.lith_class] || "#6b7280";
       const clsLabel = r.lith_class ? r.lith_class.charAt(0).toUpperCase() + r.lith_class.slice(1) : "";
       const macroUrl = `https://macrostrat.org/map/loc/${r.lng.toFixed(4)}/${r.lat.toFixed(4)}`;
 
@@ -976,7 +1034,6 @@
   }
 
   const geoInfoEl = $("#geology-info");
-  if (geoInfoEl) geoInfoEl.addEventListener("click", toggleGeologyGallery);
 
   function toggleGeologyLayer() {
     if (!leafletMap || !geologyTileLayer) return;
@@ -1053,6 +1110,7 @@
     ebirdSpeciesData = {};
     allEbirdObservations = [];
     geologyData = [];
+    activeGeoClass = null;
 
     const month = parseInt(monthSelect.value, 10);
     const bbox = currentBbox();

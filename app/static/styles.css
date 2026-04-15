@@ -784,11 +784,53 @@ body {
 }
 
 /* ── Geology ── */
-#geology-info .territory-link {
-  padding-left: 6px;
+.geo-class-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
 }
-#geology-info:hover {
-  opacity: 0.8;
+.geo-class-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #e5e7eb;
+  color: #6b7280;
+  background: #fff;
+  transition: all 0.15s;
+  user-select: none;
+}
+.geo-class-pill i {
+  font-size: 8px;
+}
+.geo-class-pill .geo-pill-count {
+  font-size: 9px;
+  opacity: 0.7;
+  margin-left: 1px;
+}
+.geo-class-pill:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+.geo-class-pill.active {
+  background: var(--geo-color, #374151);
+  color: #fff;
+  border-color: var(--geo-color, #374151);
+}
+.geo-class-pill.active .geo-pill-count {
+  opacity: 0.85;
+}
+.geo-class-pill[data-cls="__all__"] {
+  --geo-color: #374151;
+}
+.geo-class-pill.off {
+  opacity: 0.45;
 }
 .geology-gallery {
   display: grid;
