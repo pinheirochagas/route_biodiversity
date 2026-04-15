@@ -673,6 +673,14 @@ body {
   background: #fef9c3;
   color: #854d0e;
 }
+.source-badge.wiki {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+.source-badge.macro {
+  background: #fae8d0;
+  color: #92400e;
+}
 
 /* ── Inline eBird time select inside toggle row ── */
 .ebird-inline-select {
@@ -773,6 +781,122 @@ body {
   font-size: 9px;
   color: #3b82f6;
   line-height: 1;
+}
+
+/* ── Geology ── */
+#geology-info .territory-link {
+  padding-left: 6px;
+}
+#geology-info:hover {
+  opacity: 0.8;
+}
+.geology-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+.geology-gallery.hidden {
+  display: none;
+}
+.geology-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.geology-card:hover {
+  border-color: #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+.geology-card-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  background: #f3f4f6;
+}
+.geology-card-body {
+  padding: 6px 8px 6px;
+}
+.geology-card .rock-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.geology-card .rock-class {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 1px;
+}
+.geology-card .rock-age {
+  font-size: 9px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.geology-card .rock-formation {
+  font-size: 9px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.geology-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 6px;
+}
+.geology-card-footer a {
+  font-size: 9px;
+  color: #9ca3af;
+  text-decoration: none;
+}
+.geology-card-footer a:hover {
+  color: #3b82f6;
+}
+@media (max-width: 768px) {
+  .geology-gallery {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.geo-overlay-control {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  padding: 4px 8px;
+  font-family: Inter, sans-serif;
+  font-size: 11px;
+  color: #374151;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+.geo-overlay-control:hover {
+  background: #f9fafb;
+}
+.geo-overlay-control input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: #a3724e;
+  cursor: pointer;
+}
+.geo-overlay-control i {
+  font-size: 11px;
+  color: #a3724e;
 }
 
 /* ── Scrollbar ── */

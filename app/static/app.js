@@ -23,6 +23,10 @@
   let ebirdClusterGroup = null;
   let ebirdMarkers = [];
   let expandedBboxPoly = null;
+  let geologyEnabled = true;
+  let geologyData = [];
+  let geologyTileLayer = null;
+  let routeLocation = { city: "", state: "", country: "" };
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -60,6 +64,7 @@
   const sourcesSection = $("#sources-section");
   const ebirdBackSelect = $("#ebird-back");
   const bboxExpandSelect = $("#bbox-expand");
+  let geoOverlayCb = null;
 
   // ── Taxa Font Awesome icon classes ──
   const TAXA_ICON_CLASSES = {
@@ -353,6 +358,13 @@
           } else if (ebirdClusterGroup && leafletMap) {
             leafletMap.removeLayer(ebirdClusterGroup);
           }
+        } else if (source === "geology") {
+          geologyEnabled = !geologyEnabled;
+          el.classList.toggle("active", geologyEnabled);
+          el.classList.toggle("off", !geologyEnabled);
+          toggleGeologyLayer();
+          renderGeologyInfo(geologyData);
+          return;
         }
         const merged = getMergedSpeciesData();
         renderTaxaFilters(merged);
@@ -443,6 +455,11 @@
     taxaSection.classList.remove("hidden");
     routeNameEl.textContent = routeData.name;
     routeCountry.textContent = "";
+    const geologyInfoEl = $("#geology-info");
+    if (geologyInfoEl) geologyInfoEl.innerHTML = "";
+    const geologyGalleryEl = $("#geology-gallery");
+    if (geologyGalleryEl) { geologyGalleryEl.classList.add("hidden"); geologyGalleryEl.innerHTML = ""; }
+    geologyGalleryOpen = false;
     const routeDateEl = $("#route-date");
     if (routeDateEl && routeData.date) {
       const d = new Date(routeData.date);
@@ -461,11 +478,13 @@
     inatEnabled = true;
     gbifEnabled = true;
     ebirdEnabled = true;
+    geologyEnabled = true;
     gbifSpeciesData = {};
     ebirdSpeciesData = {};
     allEbirdObservations = [];
+    geologyData = [];
 
-    for (const src of ["inat", "gbif", "ebird"]) {
+    for (const src of ["inat", "gbif", "ebird", "geology"]) {
       const toggle = $(`[data-source="${src}"]`);
       if (toggle) { toggle.classList.add("active"); toggle.classList.remove("off"); }
     }
@@ -477,9 +496,11 @@
     renderMobileSources();
     setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 200);
 
+    routeLocation = { city: "", state: "", country: "" };
+
     renderMap(routeData.coords, routeData.bbox);
-    fetchTerritories(routeData.bbox);
-    loadAllSpecies();
+    const locationReady = fetchTerritories(routeData.bbox);
+    loadAllSpecies(locationReady);
   }
 
   function renderMobileSources() {
@@ -492,6 +513,7 @@
       { key: "inat", label: "iNat", icon: "fa-binoculars", color: "#74ac00" },
       { key: "gbif", label: "GBIF", icon: "fa-database", color: "#8b5cf6" },
       { key: "ebird", label: "eBird", icon: "fa-dove", color: "#3b82f6" },
+      { key: "geology", label: "Geology", icon: "fa-mountain", color: "#a3724e" },
     ];
     for (const s of sources) {
       const pill = document.createElement("span");
@@ -506,12 +528,19 @@
           pill.classList.toggle("active", ebirdEnabled);
           if (ebirdEnabled) renderEbirdMarkers(allEbirdObservations);
           else if (ebirdClusterGroup && leafletMap) leafletMap.removeLayer(ebirdClusterGroup);
+        } else if (s.key === "geology") {
+          geologyEnabled = !geologyEnabled;
+          pill.classList.toggle("active", geologyEnabled);
+          toggleGeologyLayer();
+          renderGeologyInfo(geologyData);
         }
         const dtoggle = $(`[data-source="${s.key}"]`);
         if (dtoggle) { dtoggle.classList.toggle("active"); dtoggle.classList.toggle("off"); }
-        const merged = getMergedSpeciesData();
-        renderTaxaFilters(merged);
-        renderSpeciesCards();
+        if (s.key !== "geology") {
+          const merged = getMergedSpeciesData();
+          renderTaxaFilters(merged);
+          renderSpeciesCards();
+        }
       });
       row.appendChild(pill);
     }
@@ -551,6 +580,7 @@
       const data = await resp.json();
       if (data.location) {
         const loc = data.location;
+        routeLocation = { city: loc.city || "", state: loc.state || "", country: loc.country || "" };
         const parts = [loc.city, loc.state, loc.country].filter(Boolean);
         const locStr = parts.join(", ");
         routeCountry.textContent = locStr;
@@ -811,8 +841,208 @@
     }
   }
 
+  // ── Geology rendering ──
+  function renderGeologyInfo(formations) {
+    const el = $("#geology-info");
+    if (!el) return;
+    if (!geologyEnabled || !formations || !formations.length) {
+      el.innerHTML = "";
+      return;
+    }
+
+    const groups = {};
+    for (const f of formations) {
+      if (f.all_terms && f.all_terms.length) {
+        for (const t of f.all_terms) {
+          const cls = t["class"] || "other";
+          if (!groups[cls]) groups[cls] = new Set();
+          if (t.term) groups[cls].add(t.term);
+        }
+      } else {
+        const cls = f.lith_class || "other";
+        if (!groups[cls]) groups[cls] = new Set();
+        if (f.lith_term) groups[cls].add(f.lith_term);
+      }
+    }
+
+    const classLabels = { sedimentary: "Sedimentary", igneous: "Igneous", metamorphic: "Metamorphic", mineral: "Mineral", other: "Other" };
+    const classIcons = { sedimentary: "fa-layer-group", igneous: "fa-fire", metamorphic: "fa-diamond", mineral: "fa-gem", other: "fa-circle" };
+    const classColors = { sedimentary: "#d4a017", igneous: "#c0392b", metamorphic: "#7d5a50", mineral: "#4338ca", other: "#6b7280" };
+
+    let html = '<span style="font-size:10px;color:#6b7280;font-weight:500"><i class="fa-solid fa-mountain" style="color:#a3724e;margin-right:2px"></i> Geology: </span>';
+    const parts = [];
+    for (const cls of ["sedimentary", "igneous", "metamorphic", "mineral", "other"]) {
+      if (!groups[cls] || groups[cls].size === 0) continue;
+      const rocks = [...groups[cls]].join(", ");
+      parts.push(`<span style="font-size:10px"><span style="color:${classColors[cls]};font-weight:600"><i class="fa-solid ${classIcons[cls]}" style="font-size:8px;margin-right:1px"></i> ${classLabels[cls]}:</span> <span style="color:#6b7280">${rocks}</span></span>`);
+    }
+    const chevron = '<i class="fa-solid fa-chevron-down" style="font-size:8px;color:#d1d5db;margin-left:4px;transition:transform 0.2s" id="geology-chevron"></i>';
+    el.innerHTML = html + parts.join(' <span style="color:#d1d5db">|</span> ') + chevron;
+  }
+
+  let geologyGalleryOpen = false;
+
+  function toggleGeologyGallery() {
+    const gallery = $("#geology-gallery");
+    if (!gallery) return;
+    geologyGalleryOpen = !geologyGalleryOpen;
+    gallery.classList.toggle("hidden", !geologyGalleryOpen);
+    const chevron = $("#geology-chevron");
+    if (chevron) chevron.style.transform = geologyGalleryOpen ? "rotate(180deg)" : "";
+    if (geologyGalleryOpen) renderGeologyGallery(geologyData);
+  }
+
+  function renderGeologyGallery(formations) {
+    const gallery = $("#geology-gallery");
+    if (!gallery || !formations || !formations.length) return;
+    gallery.innerHTML = "";
+
+    const classColors = { sedimentary: "#d4a017", igneous: "#c0392b", metamorphic: "#7d5a50", mineral: "#4338ca", other: "#6b7280" };
+
+    const seen = new Set();
+    const rocks = [];
+    for (const f of formations) {
+      const src = f.source || "macrostrat";
+      if (f.all_terms && f.all_terms.length) {
+        for (const t of f.all_terms) {
+          const key = t.term.toLowerCase();
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            rocks.push({
+              term: t.term,
+              lith_class: t["class"] || "",
+              formation: f.name,
+              age: f.age || "",
+              color: f.color,
+              photo_url: t.photo_url || f.photo_url || "",
+              wiki_url: t.wiki_url || f.wiki_url || "",
+              lat: f.lat,
+              lng: f.lng,
+              source: t.source || src,
+            });
+          }
+        }
+      } else if (f.lith_term) {
+        const key = f.lith_term.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          rocks.push({
+            term: f.lith_term,
+            lith_class: f.lith_class || "",
+            formation: f.name,
+            age: f.age || "",
+            color: f.color,
+            photo_url: f.photo_url || "",
+            wiki_url: f.wiki_url || "",
+            lat: f.lat,
+            lng: f.lng,
+            source: src,
+          });
+        }
+      }
+    }
+
+    for (const r of rocks) {
+      const card = document.createElement("div");
+      card.className = "geology-card";
+      const clsColor = classColors[r.lith_class] || "#6b7280";
+      const clsLabel = r.lith_class ? r.lith_class.charAt(0).toUpperCase() + r.lith_class.slice(1) : "";
+      const macroUrl = `https://macrostrat.org/map/loc/${r.lng.toFixed(4)}/${r.lat.toFixed(4)}`;
+
+      const isWiki = r.source === "wikipedia";
+      const srcBadge = isWiki
+        ? '<span class="source-badge wiki" title="From Wikipedia">W</span>'
+        : '<span class="source-badge macro" title="From Macrostrat">M</span>';
+
+      card.innerHTML = `
+        ${r.photo_url ? `<img class="geology-card-img" src="${r.photo_url}" alt="${r.term}" loading="lazy">` : '<div class="geology-card-img"></div>'}
+        <div class="geology-card-body">
+          ${clsLabel ? `<div class="rock-class" style="color:${clsColor}">${clsLabel} ${srcBadge}</div>` : srcBadge}
+          <div class="rock-name" style="border-left:3px solid ${r.color};padding-left:5px">${r.term}</div>
+          ${r.formation && !isWiki ? `<div class="rock-formation">${r.formation}</div>` : ""}
+          ${r.age ? `<div class="rock-age">${r.age}</div>` : ""}
+        </div>
+        <div class="geology-card-footer">
+          ${r.wiki_url ? `<a href="${r.wiki_url}" target="_blank">Wikipedia &rarr;</a>` : "<span></span>"}
+          ${!isWiki ? `<a href="${macroUrl}" target="_blank">Macrostrat &rarr;</a>` : ""}
+        </div>`;
+
+      card.addEventListener("click", (e) => {
+        if (e.target.closest("a")) return;
+        if (leafletMap) leafletMap.flyTo([r.lat, r.lng], 15);
+      });
+      gallery.appendChild(card);
+    }
+  }
+
+  const geoInfoEl = $("#geology-info");
+  if (geoInfoEl) geoInfoEl.addEventListener("click", toggleGeologyGallery);
+
+  function toggleGeologyLayer() {
+    if (!leafletMap || !geologyTileLayer) return;
+    const showOverlay = geologyEnabled && geoOverlayCb && geoOverlayCb.checked;
+    if (showOverlay && !leafletMap.hasLayer(geologyTileLayer)) {
+      geologyTileLayer.addTo(leafletMap);
+    } else if (!showOverlay && leafletMap.hasLayer(geologyTileLayer)) {
+      leafletMap.removeLayer(geologyTileLayer);
+    }
+  }
+
+
+  function _buildGeologyPopup(f) {
+    const ageRange = (f.b_age > 0) ? `${f.t_age}–${f.b_age} Ma` : "";
+    const photoHtml = f.photo_url
+      ? `<img src="${f.photo_url}" style="width:100%;max-height:120px;object-fit:cover;border-radius:4px;margin-bottom:4px" alt="${f.lith_term || f.name}">`
+      : "";
+    const wikiLink = f.wiki_url
+      ? `<a href="${f.wiki_url}" target="_blank" style="font-size:10px;color:#3b82f6;margin-right:8px">${f.lith_term || "Wikipedia"} &rarr;</a>`
+      : "";
+    const classLabel = f.lith_class ? `<span style="font-size:9px;font-weight:600;text-transform:uppercase;color:#6b7280;letter-spacing:0.5px">${f.lith_class}</span>` : "";
+    const allRocks = (f.all_terms && f.all_terms.length)
+      ? f.all_terms.map((t) => t.term).filter(Boolean).join(", ")
+      : f.lith_term || "";
+    return `<div style="max-width:240px">
+      ${photoHtml}
+      ${classLabel}
+      <div style="font-weight:600;font-size:12px;margin-bottom:2px;border-left:4px solid ${f.color};padding-left:6px">${f.name}</div>
+      <div style="font-size:10px;color:#6b7280">${[allRocks, f.age, ageRange].filter(Boolean).join(" · ")}</div>
+      ${f.descrip ? `<div style="font-size:10px;color:#9ca3af;margin-top:4px">${f.descrip.slice(0, 200)}${f.descrip.length > 200 ? "..." : ""}</div>` : ""}
+      <div style="margin-top:4px">
+        ${wikiLink}
+        <a href="https://macrostrat.org/map/loc/${f.lng.toFixed(4)}/${f.lat.toFixed(4)}" target="_blank" style="font-size:10px;color:#3b82f6">Macrostrat &rarr;</a>
+      </div>
+    </div>`;
+  }
+
+  async function handleGeologyMapClick(e) {
+    if (!geologyEnabled || !geologyTileLayer || !leafletMap.hasLayer(geologyTileLayer)) return;
+    const { lat, lng } = e.latlng;
+    const popup = L.popup({ maxWidth: 280 })
+      .setLatLng(e.latlng)
+      .setContent('<div style="font-size:11px;color:#9ca3af;padding:4px">Loading geology...</div>')
+      .openOn(leafletMap);
+    try {
+      const resp = await fetch("/api/geology/point", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat, lng }),
+      });
+      if (!resp.ok) { popup.remove(); return; }
+      const data = await resp.json();
+      const formations = data.formations || [];
+      if (!formations.length) {
+        popup.setContent('<div style="font-size:11px;color:#9ca3af;padding:4px">No geological data at this point</div>');
+        return;
+      }
+      const html = formations.slice(0, 3).map((f) => _buildGeologyPopup(f)).join('<hr style="margin:6px 0;border:none;border-top:1px solid #e5e7eb">');
+      popup.setContent(html);
+    } catch (_) {
+      popup.remove();
+    }
+  }
+
   // ── Species loading (all sources in parallel, each independent) ──
-  async function loadAllSpecies() {
+  async function loadAllSpecies(locationReady) {
     if (!routeData) return;
     hideError();
     speciesLoading.classList.remove("hidden");
@@ -822,6 +1052,7 @@
     gbifSpeciesData = {};
     ebirdSpeciesData = {};
     allEbirdObservations = [];
+    geologyData = [];
 
     const month = parseInt(monthSelect.value, 10);
     const bbox = currentBbox();
@@ -830,9 +1061,11 @@
     const inatCountEl = $("#inat-count");
     const gbifCountEl = $("#gbif-count");
     const ebirdCountEl = $("#ebird-count");
+    const geologyCountEl = $("#geology-count");
     if (inatCountEl) inatCountEl.textContent = "...";
     if (gbifCountEl) gbifCountEl.textContent = "...";
     if (ebirdCountEl) ebirdCountEl.textContent = "...";
+    if (geologyCountEl) geologyCountEl.textContent = "...";
 
     const reqBody = JSON.stringify({ bbox, month, hull });
     const reqHeaders = { "Content-Type": "application/json" };
@@ -897,7 +1130,32 @@
       renderIfReady();
     }
 
-    await Promise.allSettled([loadInat(), loadGbif(), loadEbird()]);
+    async function loadGeology() {
+      try {
+        if (locationReady) await locationReady.catch(() => {});
+        const resp = await fetch("/api/geology", {
+          method: "POST", headers: reqHeaders,
+          body: JSON.stringify({
+            coords: routeData.coords,
+            city: routeLocation.city,
+            state: routeLocation.state,
+            country: routeLocation.country,
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          geologyData = data.formations || [];
+          if (geologyCountEl) geologyCountEl.textContent = geologyData.length;
+          renderGeologyInfo(geologyData);
+        } else {
+          if (geologyCountEl) geologyCountEl.textContent = "err";
+        }
+      } catch (e) {
+        if (geologyCountEl) geologyCountEl.textContent = "err";
+      }
+    }
+
+    await Promise.allSettled([loadInat(), loadGbif(), loadEbird(), loadGeology()]);
   }
 
   // ── Species card rendering ──
@@ -1129,6 +1387,7 @@
     allObsMarkers = [];
     ebirdClusterGroup = null;
     ebirdMarkers = [];
+    geologyTileLayer = null;
 
     leafletMap = L.map("map", { zoomControl: true, scrollWheelZoom: true });
 
@@ -1136,6 +1395,33 @@
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 19,
     }).addTo(leafletMap);
+
+    geologyTileLayer = L.tileLayer("https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png", {
+      opacity: 0.5,
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://macrostrat.org">Macrostrat</a>',
+    });
+    if (geologyEnabled) geologyTileLayer.addTo(leafletMap);
+
+    const GeoControl = L.Control.extend({
+      options: { position: "bottomleft" },
+      onAdd: function () {
+        const container = L.DomUtil.create("label", "geo-overlay-control");
+        const cb = L.DomUtil.create("input", "", container);
+        cb.type = "checkbox";
+        cb.checked = geologyEnabled;
+        geoOverlayCb = cb;
+        const icon = L.DomUtil.create("i", "fa-solid fa-mountain", container);
+        const text = L.DomUtil.create("span", "", container);
+        text.textContent = "Geology";
+        L.DomEvent.disableClickPropagation(container);
+        cb.addEventListener("change", toggleGeologyLayer);
+        return container;
+      },
+    });
+    leafletMap.addControl(new GeoControl());
+
+    leafletMap.on("click", handleGeologyMapClick);
 
     L.polyline(coords, { color: "#111827", weight: 2.5, opacity: 0.8 }).addTo(leafletMap);
 

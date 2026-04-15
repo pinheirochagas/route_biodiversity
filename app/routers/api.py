@@ -29,6 +29,7 @@ from app.services.biodiversity import (
     fetch_gbif_ebird_species,
 )
 from app.services.ebird import fetch_recent_observations, fetch_notable_observations, enrich_with_photos
+from app.services.geology import fetch_geology_along_route, fetch_geology_at_point
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -201,6 +202,30 @@ async def get_territories(body: dict, settings: Settings = Depends(get_settings)
     )
     location = await identify_location(tuple(bbox))
     return {"territories": territories, "location": location}
+
+
+@router.post("/geology")
+async def get_geology(body: dict):
+    coords = body.get("coords")
+    if not coords or len(coords) < 2:
+        raise HTTPException(400, "coords must be a list of [lat, lng] points")
+    city = body.get("city", "")
+    state = body.get("state", "")
+    country = body.get("country", "")
+    formations = await fetch_geology_along_route(
+        coords, city=city, state=state, country=country,
+    )
+    return {"formations": formations}
+
+
+@router.post("/geology/point")
+async def get_geology_point(body: dict):
+    lat = body.get("lat")
+    lng = body.get("lng")
+    if lat is None or lng is None:
+        raise HTTPException(400, "lat and lng are required")
+    formations = await fetch_geology_at_point(float(lat), float(lng))
+    return {"formations": formations}
 
 
 @router.post("/gbif/species")

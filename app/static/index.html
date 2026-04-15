@@ -125,6 +125,11 @@
                 <option value="all">All time</option>
               </select>
             </div>
+            <div class="taxa-toggle active" data-source="geology">
+              <span class="taxa-toggle-icon" style="color:#a3724e"><i class="fa-solid fa-mountain"></i></span>
+              <span class="taxa-toggle-label">Geology</span>
+              <span class="taxa-toggle-count" id="geology-count"></span>
+            </div>
           </div>
           <div id="bbox-expand-row" class="flex items-center gap-1.5 mt-1.5">
             <span class="text-[9px] text-gray-400 flex-shrink-0">Search area:</span>
@@ -164,6 +169,8 @@
             <span id="route-country"></span>
           </div>
           <div id="territories" class="mt-1"></div>
+          <div id="geology-info" class="mt-1" style="cursor:pointer"></div>
+          <div id="geology-gallery" class="geology-gallery hidden"></div>
         </div>
       </div>
 
