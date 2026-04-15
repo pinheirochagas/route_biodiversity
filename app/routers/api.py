@@ -215,7 +215,7 @@ async def get_territories(body: dict, settings: Settings = Depends(get_settings)
     territories = await fetch_indigenous_territories(
         tuple(bbox), api_key=settings.native_land_api_key
     )
-    location = await identify_location(tuple(bbox))
+    location = await identify_location(tuple(bbox), google_api_key=settings.google_api_key)
     return {"territories": territories, "location": location}
 
 

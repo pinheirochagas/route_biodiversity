@@ -7,13 +7,8 @@ from datetime import date
 INATURALIST_COUNTS_URL = "https://api.inaturalist.org/v1/observations/species_counts"
 INATURALIST_OBS_URL = "https://api.inaturalist.org/v1/observations"
 NATIVE_LAND_URL = "https://native-land.ca/api/index.php"
-BIGDATACLOUD_URL = "https://api.bigdatacloud.net/data/reverse-geocode-client"
 GBIF_OCCURRENCE_URL = "https://api.gbif.org/v1/occurrence/search"
 GBIF_SPECIES_URL = "https://api.gbif.org/v1/species"
-
-COUNTRY_NAME_MAPPING = {
-    "United States of America (the)": "United States",
-}
 
 TAXA_LIST = [
     "Mammalia", "Reptilia", "Aves", "Actinopterygii",
@@ -118,39 +113,36 @@ def bbox_center(bbox: tuple) -> tuple[float, float]:
     return ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
 
 
-async def identify_location(bbox: tuple) -> dict:
+async def identify_location(bbox: tuple, google_api_key: str = "") -> dict:
     """Return {city, state, country, county} for the center of a bounding box."""
     lat, lng = bbox_center(bbox)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(BIGDATACLOUD_URL, params={
-                "latitude": lat, "longitude": lng, "localityLanguage": "en",
-            })
+            resp = await client.get(
+                "https://maps.googleapis.com/maps/api/geocode/json",
+                params={
+                    "latlng": f"{lat},{lng}",
+                    "key": google_api_key,
+                },
+            )
             if resp.status_code == 200:
-                data = resp.json()
-                country = data.get("countryName") or ""
-                country = COUNTRY_NAME_MAPPING.get(country, country)
-                city = data.get("city") or data.get("locality") or ""
-                state = data.get("principalSubdivision") or ""
-                county = ""
-                admin_levels = (
-                    data.get("localityInfo", {}).get("administrative", [])
-                )
-                for entry in admin_levels:
-                    desc = (entry.get("description") or "").lower()
-                    name = entry.get("name", "")
-                    if (
-                        desc.startswith("county")
-                        or desc.startswith("municipality")
-                        or "and county" in desc
-                        or "county" in name.lower()
-                    ):
-                        county = name
+                results = resp.json().get("results", [])
+                city = state = country = county = ""
+                for result in results:
+                    for c in result.get("address_components", []):
+                        types = c.get("types", [])
+                        if "locality" in types and not city:
+                            city = c["long_name"]
+                        elif "administrative_area_level_2" in types and not county:
+                            county = c["long_name"]
+                        elif "administrative_area_level_1" in types and not state:
+                            state = c["long_name"]
+                        elif "country" in types and not country:
+                            country = c["long_name"]
+                    if city and state and country:
                         break
-                return {
-                    "city": city, "state": state,
-                    "country": country, "county": county,
-                }
+                if state or country:
+                    return {"city": city, "state": state, "country": country, "county": county}
     except Exception:
         pass
     return {"city": "", "state": "", "country": "", "county": ""}

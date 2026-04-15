@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=3">
 </head>
 <body class="bg-white text-gray-900 antialiased">
 
@@ -110,6 +110,22 @@
                     class="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 transition-colors disabled:opacity-40">
               <i class="fa-solid fa-location-crosshairs"></i> Use my location
             </button>
+            <div class="flex items-center gap-2 my-2">
+              <div class="flex-1 h-px bg-gray-200"></div>
+              <span class="text-[9px] text-gray-400">or</span>
+              <div class="flex-1 h-px bg-gray-200"></div>
+            </div>
+            <div class="relative">
+              <div class="flex gap-1">
+                <input id="situate-search" type="text" placeholder="Search a place..." autocomplete="off"
+                       class="flex-1 px-2 py-2 text-xs border border-gray-200 rounded-md focus:outline-none focus:border-gray-400">
+                <button id="btn-situate-search"
+                        class="px-3 py-2 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+              </div>
+              <ul id="situate-suggestions" class="hidden"></ul>
+            </div>
           </div>
         </div>
 
@@ -265,6 +281,6 @@
 
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>

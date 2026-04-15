@@ -941,6 +941,42 @@ body {
   color: #a3724e;
 }
 
+/* ── Location search suggestions ── */
+ul#situate-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  margin: 2px 0 0 0;
+  padding: 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  max-height: 160px;
+  overflow-y: auto;
+}
+ul#situate-suggestions li {
+  padding: 5px 8px;
+  font-size: 9px;
+  color: #9ca3af;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  line-height: 1.4;
+  margin: 0;
+}
+ul#situate-suggestions li:last-child { border-bottom: none; }
+ul#situate-suggestions li:hover,
+ul#situate-suggestions li.active {
+  background: #f3f4f6;
+}
+ul#situate-suggestions li b {
+  font-weight: 600;
+  color: #111827;
+}
+
 /* ── Scrollbar ── */
 .sidebar-scroll::-webkit-scrollbar,
 .panel-center::-webkit-scrollbar {

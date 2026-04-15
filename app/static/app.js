@@ -550,6 +550,149 @@
     });
   }
 
+  // ── Situate (location search with autocomplete) ──
+  const situateSearchInput = $("#situate-search");
+  const btnSituateSearch = $("#btn-situate-search");
+  const suggestionsEl = $("#situate-suggestions");
+  let suggestDebounce = null;
+  let activeSuggestion = -1;
+  let currentSuggestions = [];
+
+  function hideSuggestions() {
+    if (suggestionsEl) { suggestionsEl.classList.add("hidden"); suggestionsEl.innerHTML = ""; }
+    activeSuggestion = -1;
+    currentSuggestions = [];
+  }
+
+  function showSuggestions(results) {
+    if (!suggestionsEl || !results.length) { hideSuggestions(); return; }
+    currentSuggestions = results;
+    activeSuggestion = -1;
+    suggestionsEl.innerHTML = "";
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      const parts = r.display_name.split(",");
+      const primary = parts[0].trim();
+      const rest = parts.slice(1).map(s => s.trim()).filter(Boolean);
+      const country = rest.length ? rest[rest.length - 1] : "";
+      const mid = rest.slice(0, -1).join(", ");
+      const secondary = [mid, country].filter(Boolean).join(", ");
+      const li = document.createElement("li");
+      li.innerHTML = `<b>${primary}</b>${secondary ? ", " + secondary : ""}`;
+      li.addEventListener("click", () => selectSuggestion(r));
+      suggestionsEl.appendChild(li);
+    }
+    suggestionsEl.classList.remove("hidden");
+  }
+
+  function updateActiveSuggestionStyle() {
+    if (!suggestionsEl) return;
+    const items = suggestionsEl.querySelectorAll("li");
+    items.forEach((li, i) => li.classList.toggle("active", i === activeSuggestion));
+    if (activeSuggestion >= 0 && items[activeSuggestion]) {
+      items[activeSuggestion].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function selectSuggestion(place) {
+    hideSuggestions();
+    const lat = parseFloat(place.lat);
+    const lng = parseFloat(place.lon);
+    const displayName = place.display_name.split(",")[0].trim();
+    if (situateSearchInput) situateSearchInput.value = displayName;
+    launchSituate(lat, lng, displayName);
+  }
+
+  function launchSituate(lat, lng, name) {
+    hideError();
+    closeMobileSidebar();
+    showLoading(`Loading ${name}...`);
+    const latDelta = 0.0225;
+    const lngDelta = 0.0225 / Math.cos((lat * Math.PI) / 180);
+    routeData = {
+      name: name,
+      coords: [[lat, lng]],
+      bbox: [lat - latDelta, lng - lngDelta, lat + latDelta, lng + lngDelta],
+      hull: null,
+      month: 0,
+      date: new Date().toISOString(),
+      situateMe: true,
+    };
+    drawnBbox = null;
+    drawnLayer = null;
+    monthSelect.value = 0;
+    showResults();
+  }
+
+  async function fetchSuggestions(query) {
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=0`,
+        { headers: { "Accept": "application/json" } }
+      );
+      return await resp.json();
+    } catch { return []; }
+  }
+
+  async function searchLocation() {
+    const query = (situateSearchInput ? situateSearchInput.value.trim() : "");
+    if (!query) return;
+    hideSuggestions();
+    showLoading(`Searching "${query}"...`);
+    const results = await fetchSuggestions(query);
+    if (!results || !results.length) {
+      hideLoading();
+      showError(`No results found for "${query}".`);
+      return;
+    }
+    selectSuggestion(results[0]);
+  }
+
+  if (situateSearchInput) {
+    situateSearchInput.addEventListener("input", () => {
+      clearTimeout(suggestDebounce);
+      const q = situateSearchInput.value.trim();
+      if (q.length < 2) { hideSuggestions(); return; }
+      suggestDebounce = setTimeout(async () => {
+        const results = await fetchSuggestions(q);
+        if (situateSearchInput.value.trim() === q) showSuggestions(results);
+      }, 300);
+    });
+
+    situateSearchInput.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (currentSuggestions.length) {
+          activeSuggestion = Math.min(activeSuggestion + 1, currentSuggestions.length - 1);
+          updateActiveSuggestionStyle();
+        }
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (currentSuggestions.length) {
+          activeSuggestion = Math.max(activeSuggestion - 1, 0);
+          updateActiveSuggestionStyle();
+        }
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (activeSuggestion >= 0 && currentSuggestions[activeSuggestion]) {
+          selectSuggestion(currentSuggestions[activeSuggestion]);
+        } else {
+          searchLocation();
+        }
+      } else if (e.key === "Escape") {
+        hideSuggestions();
+      }
+    });
+
+    situateSearchInput.addEventListener("blur", () => {
+      setTimeout(hideSuggestions, 200);
+    });
+  }
+
+  if (btnSituateSearch) {
+    btnSituateSearch.addEventListener("click", searchLocation);
+  }
+
   // ── Show Results ──
   async function showResults() {
     hideLoading();
@@ -566,6 +709,7 @@
     routeCountry.textContent = "";
     const sep = $("#route-loc-sep");
     if (sep) sep.classList.add("hidden");
+
     const geologyInfoEl = $("#geology-info");
     if (geologyInfoEl) geologyInfoEl.innerHTML = "";
     const geologyGalleryEl = $("#geology-gallery");

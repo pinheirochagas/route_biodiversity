@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     native_land_api_key: str = ""
     ebird_api_key: str = ""
     mindat_api_key: str = ""
+    google_api_key: str = ""
 
     @property
     def strava_redirect_uri(self) -> str:
