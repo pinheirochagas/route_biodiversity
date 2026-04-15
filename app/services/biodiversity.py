@@ -8,6 +8,8 @@ INATURALIST_COUNTS_URL = "https://api.inaturalist.org/v1/observations/species_co
 INATURALIST_OBS_URL = "https://api.inaturalist.org/v1/observations"
 NATIVE_LAND_URL = "https://native-land.ca/api/index.php"
 BIGDATACLOUD_URL = "https://api.bigdatacloud.net/data/reverse-geocode-client"
+GBIF_OCCURRENCE_URL = "https://api.gbif.org/v1/occurrence/search"
+GBIF_SPECIES_URL = "https://api.gbif.org/v1/species"
 
 COUNTRY_NAME_MAPPING = {
     "United States of America (the)": "United States",
@@ -338,3 +340,234 @@ async def fetch_all_observations(
         obs = await fetch_observations(bbox, month, taxa=taxa, per_page=10, hull=hull)
         all_obs.extend(obs)
     return all_obs
+
+
+# ── GBIF ──
+
+GBIF_ICONIC_TAXA_MAP = {
+    "Mammalia": "MAMMALIA",
+    "Aves": "AVES",
+    "Reptilia": "REPTILIA",
+    "Amphibia": "AMPHIBIA",
+    "Actinopterygii": "ACTINOPTERYGII",
+    "Plantae": "PLANTAE",
+    "Fungi": "FUNGI",
+    "Insecta": "INSECTA",
+    "Arachnida": "ARACHNIDA",
+    "Mollusca": "MOLLUSCA",
+}
+
+
+GBIF_HEADERS = {"User-Agent": "RouteToBiodiversity/1.0 (https://bioroute.pedrolab.org)"}
+EBIRD_GBIF_DATASET_KEY = "4fa7b334-ce0d-4e88-aaae-2e0c138d049e"
+
+
+def _gbif_occurrences_to_species(
+    results: list[dict], hull: list[list[float]] | None = None,
+) -> dict[str, list[dict]]:
+    """Shared logic: aggregate GBIF occurrence records into species-by-taxa dict."""
+    use_hull = hull and len(hull) >= 3
+    gbif_class_to_taxa = {v: k for k, v in GBIF_ICONIC_TAXA_MAP.items()}
+    species_map: dict[str, dict[str, dict]] = {t: {} for t in TAXA_LIST}
+
+    for occ in results:
+        lat = occ.get("decimalLatitude")
+        lng = occ.get("decimalLongitude")
+        if lat is None or lng is None:
+            continue
+        if use_hull and not point_in_hull(lat, lng, hull):
+            continue
+
+        class_name = (occ.get("class") or "").upper()
+        taxa = gbif_class_to_taxa.get(class_name)
+        if not taxa:
+            kingdom = (occ.get("kingdom") or "").upper()
+            if kingdom == "PLANTAE":
+                taxa = "Plantae"
+            elif kingdom == "FUNGI":
+                taxa = "Fungi"
+            else:
+                continue
+
+        species_name = occ.get("species") or occ.get("scientificName") or ""
+        if not species_name:
+            continue
+
+        species_key = occ.get("speciesKey") or occ.get("taxonKey")
+        if not species_key:
+            continue
+
+        if species_name in species_map[taxa]:
+            species_map[taxa][species_name]["observations"] += 1
+        else:
+            media = occ.get("media") or []
+            photo_url = ""
+            for m in media:
+                if m.get("type") == "StillImage" and m.get("identifier"):
+                    photo_url = m["identifier"]
+                    break
+
+            species_map[taxa][species_name] = {
+                "id": f"gbif-{species_key}",
+                "name": species_name,
+                "common_name": occ.get("vernacularName") or "",
+                "photo_url": photo_url,
+                "observations": 1,
+                "url": f"https://www.gbif.org/species/{species_key}",
+                "wikipedia_summary": "",
+                "conservation_status": "",
+                "conservation_code": "",
+                "source": "gbif",
+            }
+
+    result = {}
+    for taxa in TAXA_LIST:
+        result[taxa] = sorted(
+            species_map[taxa].values(),
+            key=lambda s: s["observations"],
+            reverse=True,
+        )
+    return result
+
+
+async def fetch_gbif_species(
+    bbox: tuple, month: int = 0, hull: list[list[float]] | None = None,
+) -> dict[str, list[dict]]:
+    """Fetch species from GBIF grouped by taxa, matching iNat structure."""
+    params = {
+        "decimalLatitude": f"{bbox[0]},{bbox[2]}",
+        "decimalLongitude": f"{bbox[1]},{bbox[3]}",
+        "hasCoordinate": "true",
+        "hasGeospatialIssue": "false",
+        "occurrenceStatus": "PRESENT",
+        "limit": 300,
+    }
+    if month and month != 0:
+        params["month"] = month
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(GBIF_OCCURRENCE_URL, params=params, headers=GBIF_HEADERS)
+            if resp.status_code != 200:
+                return {t: [] for t in TAXA_LIST}
+            results = resp.json().get("results", [])
+    except (httpx.TimeoutException, httpx.HTTPError):
+        return {t: [] for t in TAXA_LIST}
+
+    return _gbif_occurrences_to_species(results, hull)
+
+
+async def fetch_gbif_observations(
+    bbox: tuple,
+    scientific_name: str,
+    hull: list[list[float]] | None = None,
+) -> list[dict]:
+    """Fetch individual GBIF occurrences for a single species, for map display."""
+    use_hull = hull and len(hull) >= 3
+
+    params = {
+        "scientificName": scientific_name,
+        "decimalLatitude": f"{bbox[0]},{bbox[2]}",
+        "decimalLongitude": f"{bbox[1]},{bbox[3]}",
+        "hasCoordinate": "true",
+        "hasGeospatialIssue": "false",
+        "occurrenceStatus": "PRESENT",
+        "limit": 50,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(GBIF_OCCURRENCE_URL, params=params, headers=GBIF_HEADERS)
+            if resp.status_code != 200:
+                return []
+            results = resp.json().get("results", [])
+    except (httpx.TimeoutException, httpx.HTTPError):
+        return []
+
+    observations = []
+    for occ in results:
+        lat = occ.get("decimalLatitude")
+        lng = occ.get("decimalLongitude")
+        if lat is None or lng is None:
+            continue
+        if use_hull and not point_in_hull(lat, lng, hull):
+            continue
+
+        species_key = occ.get("speciesKey") or occ.get("taxonKey") or ""
+        media = occ.get("media") or []
+        photo_url = ""
+        for m in media:
+            if m.get("type") == "StillImage" and m.get("identifier"):
+                photo_url = m["identifier"]
+                break
+
+        observations.append({
+            "lat": lat,
+            "lng": lng,
+            "species_name": occ.get("species") or occ.get("scientificName") or "",
+            "common_name": occ.get("vernacularName") or "",
+            "photo_url": photo_url,
+            "date": occ.get("eventDate") or "",
+            "observer": occ.get("recordedBy") or "",
+            "obs_url": f"https://www.gbif.org/occurrence/{occ.get('key', '')}",
+        })
+
+    return observations
+
+
+async def fetch_gbif_ebird_species(
+    bbox: tuple, hull: list[list[float]] | None = None,
+) -> list[dict]:
+    """Fetch all-time eBird data via GBIF's eBird dataset.
+
+    GBIF's eBird data has ~2 year lag, so this is only useful for historical
+    "all time" queries. Recent sightings use the eBird API directly.
+    """
+    params = {
+        "datasetKey": EBIRD_GBIF_DATASET_KEY,
+        "decimalLatitude": f"{bbox[0]},{bbox[2]}",
+        "decimalLongitude": f"{bbox[1]},{bbox[3]}",
+        "hasCoordinate": "true",
+        "hasGeospatialIssue": "false",
+        "occurrenceStatus": "PRESENT",
+        "limit": 300,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(GBIF_OCCURRENCE_URL, params=params, headers=GBIF_HEADERS)
+            if resp.status_code != 200:
+                return []
+            results = resp.json().get("results", [])
+    except (httpx.TimeoutException, httpx.HTTPError):
+        return []
+
+    use_hull = hull and len(hull) >= 3
+    species_map: dict[str, dict] = {}
+
+    for occ in results:
+        lat = occ.get("decimalLatitude")
+        lng = occ.get("decimalLongitude")
+        if lat is None or lng is None:
+            continue
+        if use_hull and not point_in_hull(lat, lng, hull):
+            continue
+
+        species_name = occ.get("species") or occ.get("scientificName") or ""
+        if not species_name:
+            continue
+
+        if species_name in species_map:
+            species_map[species_name]["count"] += 1
+        else:
+            species_map[species_name] = {
+                "common_name": occ.get("vernacularName") or "",
+                "scientific_name": species_name,
+                "count": 1,
+                "date": occ.get("eventDate") or "",
+                "location_name": occ.get("locality") or "",
+                "lat": lat,
+                "lng": lng,
+            }
+
+    return sorted(species_map.values(), key=lambda s: s["count"], reverse=True)

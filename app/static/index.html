@@ -107,10 +107,50 @@
           <div id="taxa-filters" class="space-y-0.5"></div>
         </div>
 
+        <!-- Data Sources (shown after load) -->
+        <div id="sources-section" class="sidebar-section hidden">
+          <div class="sidebar-label">Data Sources</div>
+          <div id="source-toggles" class="space-y-0.5">
+            <div class="taxa-toggle active" data-source="inat">
+              <span class="taxa-toggle-icon" style="color:#74ac00"><i class="fa-solid fa-binoculars"></i></span>
+              <span class="taxa-toggle-label">iNaturalist</span>
+              <span class="taxa-toggle-count" id="inat-count"></span>
+            </div>
+            <div class="taxa-toggle active" data-source="gbif">
+              <span class="taxa-toggle-icon" style="color:#4c8c2b"><i class="fa-solid fa-globe"></i></span>
+              <span class="taxa-toggle-label">GBIF</span>
+              <span class="taxa-toggle-count" id="gbif-count"></span>
+            </div>
+            <div class="taxa-toggle active" data-source="ebird">
+              <span class="taxa-toggle-icon" style="color:#3b82f6"><i class="fa-solid fa-dove"></i></span>
+              <span class="taxa-toggle-label">eBird</span>
+              <span class="taxa-toggle-count" id="ebird-count"></span>
+              <select id="ebird-back" class="filter-select ebird-inline-select" onclick="event.stopPropagation()">
+                <option value="7">7d</option>
+                <option value="14">14d</option>
+                <option value="30" selected>30d</option>
+                <option value="all">All time</option>
+              </select>
+            </div>
+          </div>
+          <div id="bbox-expand-row" class="flex items-center gap-1.5 mt-1.5">
+            <span class="text-[9px] text-gray-400 flex-shrink-0">Search area:</span>
+            <select id="bbox-expand" class="filter-select" style="flex:1">
+              <option value="0" selected>Route only</option>
+              <option value="25">+25%</option>
+              <option value="50">+50%</option>
+              <option value="100">+100%</option>
+              <option value="200">+200%</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Footer -->
         <div class="sidebar-footer">
           <p class="text-[9px] text-gray-300 leading-relaxed">
             <a href="https://www.inaturalist.org" target="_blank" class="underline">iNaturalist</a> &middot;
+            <a href="https://www.gbif.org" target="_blank" class="underline">GBIF</a> &middot;
+            <a href="https://ebird.org" target="_blank" class="underline">eBird</a> &middot;
             <a href="https://native-land.ca" target="_blank" class="underline">Native Land</a> &middot;
             <a href="https://github.com/pinheirochagas/route_biodiversity" target="_blank" class="underline">GitHub</a>
           </p>
@@ -175,7 +215,7 @@
           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle>
           <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"></path>
         </svg>
-        <span class="text-xs text-gray-400">Querying iNaturalist...</span>
+        <span class="text-xs text-gray-400">Querying iNaturalist + GBIF + eBird...</span>
       </div>
 
       <!-- Species Grid -->

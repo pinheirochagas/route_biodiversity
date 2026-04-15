@@ -24,7 +24,11 @@ from app.services.biodiversity import (
     fetch_observations,
     fetch_indigenous_territories,
     identify_country,
+    fetch_gbif_species,
+    fetch_gbif_observations,
+    fetch_gbif_ebird_species,
 )
+from app.services.ebird import fetch_recent_observations, fetch_notable_observations, enrich_with_photos
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -197,3 +201,86 @@ async def get_territories(body: dict, settings: Settings = Depends(get_settings)
     )
     country = await identify_country(tuple(bbox))
     return {"territories": territories, "country": country}
+
+
+@router.post("/gbif/species")
+async def get_gbif_species(body: dict):
+    bbox = body.get("bbox")
+    month = body.get("month", 0)
+    hull = body.get("hull")
+    if not bbox or len(bbox) != 4:
+        raise HTTPException(400, "bbox must be [swlat, swlng, nelat, nelng]")
+
+    species_by_taxa = await fetch_gbif_species(tuple(bbox), month, hull=hull)
+    return {"species": species_by_taxa}
+
+
+@router.post("/gbif/observations")
+async def get_gbif_observations(body: dict):
+    bbox = body.get("bbox")
+    hull = body.get("hull")
+    scientific_name = body.get("scientific_name", "")
+    if not bbox or len(bbox) != 4:
+        raise HTTPException(400, "bbox must be [swlat, swlng, nelat, nelng]")
+    if not scientific_name:
+        raise HTTPException(400, "scientific_name is required")
+
+    observations = await fetch_gbif_observations(
+        tuple(bbox), scientific_name, hull=hull,
+    )
+    return {"observations": observations}
+
+
+@router.post("/ebird/recent")
+async def get_ebird_recent(body: dict, settings: Settings = Depends(get_settings)):
+    coords = body.get("coords")
+    dist_km = body.get("dist_km", 25)
+    back_days = body.get("back_days", 14)
+    if not coords or len(coords) < 2:
+        raise HTTPException(400, "coords must be a list of [lat, lng] points")
+
+    if not settings.ebird_api_key:
+        return {"observations": [], "error": "eBird API key not configured"}
+
+    use_hull = body.get("use_hull", True)
+    ebird_hull = convex_hull(coords, buffer_deg=0.005) if use_hull else None
+    observations = await fetch_recent_observations(
+        coords, settings.ebird_api_key, dist_km=dist_km, back_days=back_days,
+        hull=ebird_hull,
+    )
+    observations = await enrich_with_photos(observations)
+    return {"observations": observations}
+
+
+@router.post("/ebird/notable")
+async def get_ebird_notable(body: dict, settings: Settings = Depends(get_settings)):
+    coords = body.get("coords")
+    dist_km = body.get("dist_km", 25)
+    back_days = body.get("back_days", 14)
+    if not coords or len(coords) < 2:
+        raise HTTPException(400, "coords must be a list of [lat, lng] points")
+
+    if not settings.ebird_api_key:
+        return {"observations": [], "error": "eBird API key not configured"}
+
+    use_hull = body.get("use_hull", True)
+    ebird_hull = convex_hull(coords, buffer_deg=0.005) if use_hull else None
+    observations = await fetch_notable_observations(
+        coords, settings.ebird_api_key, dist_km=dist_km, back_days=back_days,
+        hull=ebird_hull,
+    )
+    observations = await enrich_with_photos(observations)
+    return {"observations": observations}
+
+
+@router.post("/ebird/historical")
+async def get_ebird_historical(body: dict):
+    bbox = body.get("bbox")
+    hull = body.get("hull")
+    if not bbox or len(bbox) != 4:
+        raise HTTPException(400, "bbox must be [swlat, swlng, nelat, nelng]")
+
+    wide_hull = convex_hull(hull, buffer_deg=0.005) if hull and len(hull) >= 3 else hull
+    species = await fetch_gbif_ebird_species(tuple(bbox), hull=wide_hull)
+    species = await enrich_with_photos(species)
+    return {"species": species}
