@@ -2,14 +2,30 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import math
 import re
 from pathlib import Path
 
 import httpx
 
+log = logging.getLogger(__name__)
+
 MACROSTRAT_URL = "https://macrostrat.org/api/v2/geologic_units/map"
 WIKI_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary"
 WIKI_API_URL = "https://en.wikipedia.org/w/api.php"
+MINDAT_API_URL = "https://api.mindat.org/v1"
+
+MINDAT_COUNTRY_MAP = {
+    "United States": "USA",
+    "United States of America": "USA",
+    "United States of America (the)": "USA",
+    "United Kingdom": "UK",
+    "United Kingdom of Great Britain and Northern Ireland (the)": "UK",
+    "Russian Federation (the)": "Russia",
+    "Korea, Republic of": "South Korea",
+    "Congo, Democratic Republic of the": "DR Congo",
+}
 
 WIKI_HEADERS = {
     "User-Agent": "RouteBiodiversity/1.0 (https://bioroute.pedrolab.org; contact@pedrolab.org)",
@@ -314,6 +330,180 @@ async def _fetch_wiki_geology(
     return known
 
 
+_mindat_name_cache: dict[int, dict] = {}
+
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = (math.sin(dlat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
+         * math.sin(dlng / 2) ** 2)
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+async def _mindat_search_localities(
+    client: httpx.AsyncClient,
+    api_key: str,
+    country: str,
+    search_terms: list[str],
+    route_lat: float,
+    route_lng: float,
+    max_km: float = 150,
+) -> dict[int, dict]:
+    """Search Mindat localities by text, filtering by distance when coords available."""
+    headers = {"Authorization": f"Token {api_key}"}
+    all_locs: dict[int, dict] = {}
+
+    for txt in search_terms:
+        try:
+            resp = await client.get(
+                f"{MINDAT_API_URL}/localities/",
+                params={
+                    "format": "json", "page_size": 50, "country": country,
+                    "txt": txt, "fields": "id,txt,latitude,longitude",
+                },
+                headers=headers,
+            )
+            if resp.status_code != 200:
+                continue
+            for r in resp.json().get("results", []):
+                if r["id"] in all_locs:
+                    continue
+                lat = r.get("latitude", 0) or 0
+                lng = r.get("longitude", 0) or 0
+                has_coords = lat != 0 or lng != 0
+                if has_coords:
+                    dist = _haversine_km(route_lat, route_lng, lat, lng)
+                    if dist <= max_km:
+                        all_locs[r["id"]] = r
+                else:
+                    all_locs[r["id"]] = r
+        except Exception:
+            log.debug("Mindat locality search failed for txt=%s", txt, exc_info=True)
+    return all_locs
+
+
+async def _mindat_get_mineral_ids(
+    client: httpx.AsyncClient,
+    api_key: str,
+    locality_ids: list[int],
+    sem: asyncio.Semaphore,
+) -> set[int]:
+    """Fetch geomaterial IDs from each locality."""
+    headers = {"Authorization": f"Token {api_key}"}
+    all_ids: set[int] = set()
+
+    async def _fetch_one(lid: int):
+        async with sem:
+            try:
+                resp = await client.get(
+                    f"{MINDAT_API_URL}/localities/{lid}/",
+                    params={"format": "json", "expand": "geomaterials"},
+                    headers=headers,
+                )
+                if resp.status_code == 200:
+                    gm = resp.json().get("geomaterials", [])
+                    all_ids.update(gm)
+            except Exception:
+                pass
+
+    await asyncio.gather(*[_fetch_one(lid) for lid in locality_ids])
+    return all_ids
+
+
+async def _mindat_resolve_names(
+    client: httpx.AsyncClient,
+    api_key: str,
+    gm_ids: set[int],
+    sem: asyncio.Semaphore,
+) -> list[dict]:
+    """Resolve geomaterial IDs to name + type, using a module-level cache."""
+    headers = {"Authorization": f"Token {api_key}"}
+    to_fetch = [gid for gid in gm_ids if gid not in _mindat_name_cache]
+
+    async def _fetch_one(gid: int):
+        async with sem:
+            try:
+                resp = await client.get(
+                    f"{MINDAT_API_URL}/geomaterials/{gid}/",
+                    params={"format": "json", "fields": "id,name,entrytype_text"},
+                    headers=headers,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    _mindat_name_cache[gid] = {
+                        "name": data.get("name", ""),
+                        "entrytype": data.get("entrytype_text", "mineral"),
+                    }
+            except Exception:
+                pass
+
+    await asyncio.gather(*[_fetch_one(gid) for gid in to_fetch])
+
+    results: list[dict] = []
+    for gid in gm_ids:
+        info = _mindat_name_cache.get(gid)
+        if info and info["name"]:
+            results.append({
+                "term": info["name"],
+                "class": "mineral",
+                "type": "mineral",
+                "source": "mindat",
+                "mindat_id": gid,
+            })
+    return results
+
+
+async def _fetch_mindat_minerals(
+    country: str = "",
+    state: str = "",
+    county: str = "",
+    city: str = "",
+    route_lat: float = 0,
+    route_lng: float = 0,
+    api_key: str = "",
+) -> list[dict]:
+    """Query Mindat for minerals near a route using county/city text search."""
+    if not api_key or not country:
+        return []
+
+    country = MINDAT_COUNTRY_MAP.get(country, country)
+
+    search_terms: list[str] = []
+    if county and state:
+        search_terms.append(f"{county}, {state}")
+    elif county:
+        search_terms.append(county)
+    if city:
+        search_terms.append(city)
+    if not search_terms:
+        return []
+
+    sem = asyncio.Semaphore(5)
+    async with httpx.AsyncClient(timeout=15) as client:
+        localities = await _mindat_search_localities(
+            client, api_key, country, search_terms, route_lat, route_lng,
+        )
+        if not localities:
+            return []
+
+        gm_ids = await _mindat_get_mineral_ids(
+            client, api_key, list(localities.keys()), sem,
+        )
+        if not gm_ids:
+            return []
+
+        minerals = await _mindat_resolve_names(client, api_key, gm_ids, sem)
+
+    log.info(
+        "Mindat: %d localities, %d mineral IDs, %d resolved for %s/%s/%s",
+        len(localities), len(gm_ids), len(minerals), country, state, county,
+    )
+    return minerals
+
+
 def _sample_points(coords: list[list[float]], n: int = 30) -> list[tuple[float, float]]:
     """Pick n evenly spaced points along the route coordinates."""
     if len(coords) <= n:
@@ -331,11 +521,13 @@ async def fetch_geology_along_route(
     city: str = "",
     state: str = "",
     country: str = "",
+    county: str = "",
+    mindat_api_key: str = "",
 ) -> list[dict]:
     """Sample points along a route and return unique geological formations with photos.
 
-    Combines Macrostrat point API data with Wikipedia-sourced rock types for
-    regions where Macrostrat coverage is sparse.
+    Combines Macrostrat point API data with Wikipedia-sourced rock types and
+    Mindat locality minerals for comprehensive geomaterial coverage.
     """
     sample = _sample_points(coords)
     center_lat = sum(c[0] for c in coords) / len(coords)
@@ -344,8 +536,13 @@ async def fetch_geology_along_route(
 
     macrostrat_task = _fetch_macrostrat(sample, sem)
     wiki_task = _fetch_wiki_geology(city, state, country)
-    macro_results, wiki_rocks = await asyncio.gather(
-        macrostrat_task, wiki_task, return_exceptions=True,
+    mindat_task = _fetch_mindat_minerals(
+        country=country, state=state, county=county, city=city,
+        route_lat=center_lat, route_lng=center_lng,
+        api_key=mindat_api_key,
+    )
+    macro_results, wiki_rocks, mindat_minerals = await asyncio.gather(
+        macrostrat_task, wiki_task, mindat_task, return_exceptions=True,
     )
 
     seen_ids: set[int] = set()
@@ -367,18 +564,19 @@ async def fetch_geology_along_route(
             if t.get("term"):
                 existing_terms.add(t["term"].lower())
 
-    if isinstance(wiki_rocks, list):
-        for wr in wiki_rocks:
-            if wr["term"].lower() not in existing_terms:
-                existing_terms.add(wr["term"].lower())
-                formations.append({
+    def _append_extra(items: list[dict], source: str) -> None:
+        for item in items:
+            term_lower = item["term"].lower()
+            if term_lower not in existing_terms:
+                existing_terms.add(term_lower)
+                entry = {
                     "map_id": None,
-                    "name": wr["term"],
+                    "name": item["term"],
                     "lith": "",
-                    "lith_term": wr["term"],
-                    "lith_class": wr["class"],
-                    "lith_type": wr["type"],
-                    "all_terms": [wr],
+                    "lith_term": item["term"],
+                    "lith_class": item["class"],
+                    "lith_type": item["type"],
+                    "all_terms": [item],
                     "age": "",
                     "t_age": 0,
                     "b_age": 0,
@@ -388,8 +586,17 @@ async def fetch_geology_along_route(
                     "color": "#888888",
                     "lat": center_lat,
                     "lng": center_lng,
-                    "source": "wikipedia",
-                })
+                    "source": source,
+                }
+                if "mindat_id" in item:
+                    entry["mindat_id"] = item["mindat_id"]
+                formations.append(entry)
+
+    if isinstance(wiki_rocks, list):
+        _append_extra(wiki_rocks, "wikipedia")
+
+    if isinstance(mindat_minerals, list):
+        _append_extra(mindat_minerals, "mindat")
 
     await _enrich_with_photos(formations)
     return formations

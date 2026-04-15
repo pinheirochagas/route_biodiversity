@@ -220,15 +220,17 @@ async def get_territories(body: dict, settings: Settings = Depends(get_settings)
 
 
 @router.post("/geology")
-async def get_geology(body: dict):
+async def get_geology(body: dict, settings: Settings = Depends(get_settings)):
     coords = body.get("coords")
     if not coords or len(coords) < 1:
         raise HTTPException(400, "coords must be a list of [lat, lng] points")
     city = body.get("city", "")
     state = body.get("state", "")
     country = body.get("country", "")
+    county = body.get("county", "")
     formations = await fetch_geology_along_route(
         coords, city=city, state=state, country=country,
+        county=county, mindat_api_key=settings.mindat_api_key,
     )
     return {"formations": formations}
 

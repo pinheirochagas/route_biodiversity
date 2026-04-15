@@ -119,7 +119,7 @@ def bbox_center(bbox: tuple) -> tuple[float, float]:
 
 
 async def identify_location(bbox: tuple) -> dict:
-    """Return {city, state, country} for the center of a bounding box."""
+    """Return {city, state, country, county} for the center of a bounding box."""
     lat, lng = bbox_center(bbox)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
@@ -132,10 +132,28 @@ async def identify_location(bbox: tuple) -> dict:
                 country = COUNTRY_NAME_MAPPING.get(country, country)
                 city = data.get("city") or data.get("locality") or ""
                 state = data.get("principalSubdivision") or ""
-                return {"city": city, "state": state, "country": country}
+                county = ""
+                admin_levels = (
+                    data.get("localityInfo", {}).get("administrative", [])
+                )
+                for entry in admin_levels:
+                    desc = (entry.get("description") or "").lower()
+                    name = entry.get("name", "")
+                    if (
+                        desc.startswith("county")
+                        or desc.startswith("municipality")
+                        or "and county" in desc
+                        or "county" in name.lower()
+                    ):
+                        county = name
+                        break
+                return {
+                    "city": city, "state": state,
+                    "country": country, "county": county,
+                }
     except Exception:
         pass
-    return {"city": "", "state": "", "country": ""}
+    return {"city": "", "state": "", "country": "", "county": ""}
 
 
 async def fetch_indigenous_territories(bbox: tuple, api_key: str = "") -> list[dict]:

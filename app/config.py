@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     session_secret: str = "change-me-in-production"
     native_land_api_key: str = ""
     ebird_api_key: str = ""
+    mindat_api_key: str = ""
 
     @property
     def strava_redirect_uri(self) -> str:

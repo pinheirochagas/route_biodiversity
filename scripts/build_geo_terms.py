@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
-"""Parse BGS RockName.nt and RRUFF CSV into a single geo_terms.json lookup file.
+from __future__ import annotations
+"""Parse BGS RockName.nt, RRUFF CSV, and Mindat rocks into a single geo_terms.json lookup file.
 
 Usage:
     python scripts/build_geo_terms.py
 
+    Set MINDAT_API_KEY env var to include Mindat rock names (entrytype=7).
+    Without it, Mindat rocks are skipped.
+
 Reads:
     data/RockName.nt         – BGS Rock Classification Scheme (N-Triples RDF)
     data/RRUFF_Export_*.csv   – RRUFF mineral database export
+    Mindat API               – Rock names (entrytype=7), optional
 
 Writes:
-    app/data/geo_terms.json  – {term_lower: {class, source}} for ~9 000 terms
+    app/data/geo_terms.json  – {term_lower: {class, source}} for ~11 000 terms
 """
 
 import csv
 import json
+import os
 import re
 import sys
+import time
+import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
@@ -225,6 +233,89 @@ def spot_check(terms: dict[str, dict]) -> None:
         print("Some checks failed -- review above.")
 
 
+ROCK_CLASS_KEYWORDS = {
+    "granite": "igneous", "basalt": "igneous", "rhyolite": "igneous",
+    "andesite": "igneous", "diorite": "igneous", "gabbro": "igneous",
+    "syenite": "igneous", "trachyte": "igneous", "dacite": "igneous",
+    "phonolite": "igneous", "obsidian": "igneous", "pumice": "igneous",
+    "tuff": "igneous", "lava": "igneous", "volcanic": "igneous",
+    "plutonic": "igneous", "porphyr": "igneous", "ignimbrite": "igneous",
+    "sandstone": "sedimentary", "limestone": "sedimentary",
+    "shale": "sedimentary", "mudstone": "sedimentary",
+    "conglomerate": "sedimentary", "chalk": "sedimentary",
+    "dolomite": "sedimentary", "siltstone": "sedimentary",
+    "claystone": "sedimentary", "marl": "sedimentary",
+    "chert": "sedimentary", "flint": "sedimentary",
+    "gneiss": "metamorphic", "schist": "metamorphic",
+    "marble": "metamorphic", "quartzite": "metamorphic",
+    "slate": "metamorphic", "phyllite": "metamorphic",
+    "hornfels": "metamorphic", "amphibolite": "metamorphic",
+    "granulite": "metamorphic", "eclogite": "metamorphic",
+    "migmatite": "metamorphic", "mylonite": "metamorphic",
+    "serpentinite": "metamorphic", "cataclasite": "metamorphic",
+    "skarn": "metamorphic", "greenschist": "metamorphic",
+    "blueschist": "metamorphic", "metaconglomerate": "metamorphic",
+    "metabasalt": "metamorphic", "metagranite": "metamorphic",
+}
+
+
+def _classify_rock_name(name: str) -> str:
+    """Heuristic classification of a rock name by keyword matching."""
+    lower = name.lower()
+    if lower.startswith("meta"):
+        return "metamorphic"
+    for keyword, cls in ROCK_CLASS_KEYWORDS.items():
+        if keyword in lower:
+            return cls
+    return ""
+
+
+def fetch_mindat_rocks(api_key: str) -> dict[str, dict]:
+    """Fetch all rock names (entrytype=7) from the Mindat API."""
+    results: dict[str, dict] = {}
+    page = 1
+    total = 0
+
+    while True:
+        url = (
+            f"https://api.mindat.org/v1/geomaterials/"
+            f"?format=json&page_size=100&entrytype=7&fields=id,name&page={page}"
+        )
+        req = urllib.request.Request(
+            url, headers={"Authorization": f"Token {api_key}"}
+        )
+        try:
+            resp = urllib.request.urlopen(req)
+            data = json.loads(resp.read())
+        except Exception as e:
+            print(f"  Mindat API error on page {page}: {e}")
+            break
+
+        items = data.get("results", [])
+        for item in items:
+            name = item.get("name", "").strip()
+            if not name or len(name) < 2:
+                continue
+            key = name.lower()
+            if key not in results:
+                cls = _classify_rock_name(name)
+                results[key] = {"class": cls, "source": "mindat"}
+                total += 1
+
+        if not data.get("next"):
+            break
+        page += 1
+        time.sleep(0.1)
+
+    ign = sum(1 for v in results.values() if v["class"] == "igneous")
+    sed = sum(1 for v in results.values() if v["class"] == "sedimentary")
+    met = sum(1 for v in results.values() if v["class"] == "metamorphic")
+    unc = sum(1 for v in results.values() if v["class"] == "")
+    print(f"Mindat: {total} rock names fetched in {page} pages")
+    print(f"  igneous: {ign}, sedimentary: {sed}, metamorphic: {met}, unclassified: {unc}")
+    return results
+
+
 def main():
     if not BGS_FILE.exists():
         print(f"ERROR: {BGS_FILE} not found")
@@ -233,18 +324,31 @@ def main():
     bgs_terms = parse_bgs(BGS_FILE)
     rruff_terms = parse_rruff(ROOT / "data")
 
+    mindat_api_key = os.environ.get("MINDAT_API_KEY", "")
+    mindat_terms: dict[str, dict] = {}
+    if mindat_api_key:
+        mindat_terms = fetch_mindat_rocks(mindat_api_key)
+    else:
+        print("Mindat: skipped (set MINDAT_API_KEY env var to include)")
+
     combined = {}
     combined.update(SUPPLEMENTAL)
+    if mindat_terms:
+        combined.update(mindat_terms)
     combined.update(rruff_terms)
     combined.update(bgs_terms)
 
-    overlap = set(bgs_terms) & set(rruff_terms)
+    overlap_bgs_rruff = set(bgs_terms) & set(rruff_terms)
+    overlap_bgs_mindat = set(bgs_terms) & set(mindat_terms) if mindat_terms else set()
+    new_from_mindat = set(mindat_terms) - set(bgs_terms) - set(rruff_terms) if mindat_terms else set()
+
     print(f"\nCombined: {len(combined)} unique terms "
           f"({len(bgs_terms)} BGS + {len(rruff_terms)} RRUFF + "
-          f"{len(SUPPLEMENTAL)} supplement, {len(overlap)} BGS/RRUFF overlap)")
-
-    if overlap:
-        print(f"  Overlap examples: {list(overlap)[:10]}")
+          f"{len(mindat_terms)} Mindat + {len(SUPPLEMENTAL)} supplement)")
+    print(f"  BGS/RRUFF overlap: {len(overlap_bgs_rruff)}")
+    if mindat_terms:
+        print(f"  BGS/Mindat overlap: {len(overlap_bgs_mindat)}")
+        print(f"  New from Mindat: {len(new_from_mindat)}")
 
     spot_check(combined)
 

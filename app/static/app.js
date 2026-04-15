@@ -27,7 +27,7 @@
   let geologyData = [];
   let geologyTileLayer = null;
   let activeGeoClass = null;
-  let routeLocation = { city: "", state: "", country: "" };
+  let routeLocation = { city: "", state: "", country: "", county: "" };
   let allSourcesDone = false;
   let routePolyline = null;
   let situateBboxRect = null;
@@ -612,7 +612,7 @@
     renderMobileSources();
     setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 200);
 
-    routeLocation = { city: "", state: "", country: "" };
+    routeLocation = { city: "", state: "", country: "", county: "" };
 
     renderMap(routeData.coords, routeData.bbox);
     const locationReady = fetchTerritories(routeData.bbox);
@@ -696,7 +696,7 @@
       const data = await resp.json();
       if (data.location) {
         const loc = data.location;
-        routeLocation = { city: loc.city || "", state: loc.state || "", country: loc.country || "" };
+        routeLocation = { city: loc.city || "", state: loc.state || "", country: loc.country || "", county: loc.county || "" };
         const parts = [loc.city, loc.state, loc.country].filter(Boolean);
         const locStr = parts.join(", ");
         if (routeData && routeData.situateMe) {
@@ -1087,6 +1087,7 @@
               lat: f.lat,
               lng: f.lng,
               source: t.source || src,
+              mindat_id: t.mindat_id || f.mindat_id || null,
             });
           }
         }
@@ -1105,6 +1106,7 @@
             lat: f.lat,
             lng: f.lng,
             source: src,
+            mindat_id: f.mindat_id || null,
           });
         }
       }
@@ -1127,21 +1129,27 @@
       const macroUrl = `https://macrostrat.org/map/loc/${r.lng.toFixed(4)}/${r.lat.toFixed(4)}`;
 
       const isWiki = r.source === "wikipedia";
-      const srcBadge = isWiki
+      const isMindat = r.source === "mindat";
+      const srcBadge = isMindat
+        ? '<span class="source-badge mindat" title="From Mindat" style="background:#2d6a4f;color:#fff">m</span>'
+        : isWiki
         ? '<span class="source-badge wiki" title="From Wikipedia">W</span>'
         : '<span class="source-badge macro" title="From Macrostrat">M</span>';
+
+      const mindatUrl = r.mindat_id ? `https://www.mindat.org/min-${r.mindat_id}.html` : "";
 
       card.innerHTML = `
         ${r.photo_url ? `<img class="geology-card-img" src="${r.photo_url}" alt="${r.term}" loading="lazy">` : '<div class="geology-card-img"></div>'}
         <div class="geology-card-body">
           ${clsLabel ? `<div class="rock-class" style="color:${clsColor}">${clsLabel} ${srcBadge}</div>` : srcBadge}
           <div class="rock-name" style="border-left:3px solid ${r.color};padding-left:5px">${r.term}</div>
-          ${r.formation && !isWiki ? `<div class="rock-formation">${r.formation}</div>` : ""}
+          ${r.formation && !isWiki && !isMindat ? `<div class="rock-formation">${r.formation}</div>` : ""}
           ${r.age ? `<div class="rock-age">${r.age}</div>` : ""}
         </div>
         <div class="geology-card-footer">
           ${r.wiki_url ? `<a href="${r.wiki_url}" target="_blank">Wikipedia &rarr;</a>` : "<span></span>"}
-          ${!isWiki ? `<a href="${macroUrl}" target="_blank">Macrostrat &rarr;</a>` : ""}
+          ${mindatUrl ? `<a href="${mindatUrl}" target="_blank">Mindat &rarr;</a>` : ""}
+          ${!isWiki && !isMindat ? `<a href="${macroUrl}" target="_blank">Macrostrat &rarr;</a>` : ""}
         </div>`;
 
       card.addEventListener("click", (e) => {
@@ -1322,6 +1330,7 @@
             city: routeLocation.city,
             state: routeLocation.state,
             country: routeLocation.country,
+            county: routeLocation.county,
           }),
         });
         if (resp.ok) {
