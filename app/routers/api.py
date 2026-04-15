@@ -103,6 +103,21 @@ async def activity_cache_status(
     return get_cache_status(athlete_id)
 
 
+@router.post("/activities/load-more")
+async def load_more_activities(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+):
+    strava = _require_strava(request)
+    strava = await get_valid_token(settings, strava)
+    request.session["strava"] = strava
+    athlete_id = await _ensure_athlete_id(request, strava)
+    current_months = get_cache_status(athlete_id).get("months", 6)
+    new_months = current_months + 6
+    await build_full_activity_cache(strava["access_token"], athlete_id, force=True, months=new_months)
+    return {"activities": get_cached_activities(athlete_id), "months": new_months}
+
+
 @router.post("/activity")
 async def get_activity(
     request: Request,
@@ -207,7 +222,7 @@ async def get_territories(body: dict, settings: Settings = Depends(get_settings)
 @router.post("/geology")
 async def get_geology(body: dict):
     coords = body.get("coords")
-    if not coords or len(coords) < 2:
+    if not coords or len(coords) < 1:
         raise HTTPException(400, "coords must be a list of [lat, lng] points")
     city = body.get("city", "")
     state = body.get("state", "")

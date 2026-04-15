@@ -137,17 +137,20 @@ body {
   z-index: 0;
 }
 
-/* ── Tabs ── */
-.tab-btn {
+/* ── Tabs & Mode buttons ── */
+.tab-btn,
+.mode-btn {
   color: #9ca3af;
   background: transparent;
 }
-.tab-btn.active {
+.tab-btn.active,
+.mode-btn.active {
   color: #111827;
   background: #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
-.tab-btn:hover:not(.active) {
+.tab-btn:hover:not(.active),
+.mode-btn:hover:not(.active) {
   color: #6b7280;
 }
 
@@ -540,18 +543,15 @@ body {
     font-size: 0.5625rem;
   }
 
-  /* ── Map: always visible after route loaded ── */
+  /* ── Map: always visible ── */
   .panel-map {
-    display: none;
+    display: block;
     order: 2;
     width: 100%;
     min-width: 0;
     height: 35vh;
     flex-shrink: 0;
     border-left: none;
-  }
-  body.route-loaded .panel-map {
-    display: block;
   }
 
   /* ── Center: species + filters ── */

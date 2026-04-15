@@ -49,45 +49,67 @@
       <button id="mobile-sidebar-close" class="mobile-sidebar-close" type="button" onclick="document.getElementById('sidebar').classList.remove('mobile-expanded');document.querySelector('.mobile-fetch-toggle').classList.remove('open');var bd=document.querySelector('.mobile-sidebar-backdrop');if(bd)bd.remove();">&times; Close</button>
       <div class="sidebar-scroll">
 
-        <!-- Route Input -->
+        <!-- Mode: Activities / Situate -->
         <div class="sidebar-section">
-          <div class="sidebar-label">Route</div>
           <div class="flex gap-1 mb-2 bg-gray-50 rounded-md p-0.5">
-            <button data-tab="strava" class="tab-btn active flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
-              Strava
+            <button data-mode="activities" class="mode-btn active flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
+              Activities
             </button>
-            <button data-tab="gpx" class="tab-btn flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
-              GPX
+            <button data-mode="situate" class="mode-btn flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
+              Situate
             </button>
           </div>
 
-          <div id="tab-strava" class="tab-panel">
-            <div class="flex gap-1.5 mb-2">
-              <input type="text" id="activity-url" placeholder="Strava URL..."
-                     class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 placeholder-gray-300">
-              <button id="btn-fetch"
-                      class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 transition-colors disabled:opacity-40 whitespace-nowrap">
-                Go
+          <div id="mode-activities" class="mode-panel">
+            <p class="text-[9px] text-gray-400 mb-2" style="line-height:1.4">Explore the bio and geological diversity along your routes.</p>
+            <div class="flex gap-1 mb-2 bg-gray-50 rounded-md p-0.5">
+              <button data-tab="strava" class="tab-btn active flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
+                Strava
+              </button>
+              <button data-tab="gpx" class="tab-btn flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
+                GPX
               </button>
             </div>
-            <div id="recent-activities" class="hidden">
-              <div class="flex items-baseline justify-between" style="margin-bottom:4px">
-                <div class="sidebar-label" style="margin-bottom:0">Activities <span class="text-[9px] text-gray-300 font-normal">(6 mo)</span></div>
-                <a href="https://www.strava.com/athlete/training" target="_blank" class="text-[9px] text-gray-400 hover:text-gray-600 transition-colors">
-                  All on Strava &rarr;
-                </a>
+
+            <div id="tab-strava" class="tab-panel">
+              <div class="flex gap-1.5 mb-2">
+                <input type="text" id="activity-url" placeholder="Strava URL..."
+                       class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 placeholder-gray-300">
+                <button id="btn-fetch"
+                        class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 transition-colors disabled:opacity-40 whitespace-nowrap">
+                  Go
+                </button>
               </div>
-              <input type="text" id="activity-search" placeholder="Search activities..."
-                     class="w-full px-2 py-1.5 mb-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 placeholder-gray-300">
-              <div id="activities-list" class="space-y-0"></div>
+              <div id="recent-activities" class="hidden">
+                <div class="flex items-baseline justify-between" style="margin-bottom:4px">
+                  <div class="sidebar-label" style="margin-bottom:0">Activities <span id="activities-range" class="text-[9px] text-gray-300 font-normal">(12 mo)</span></div>
+                  <a href="https://www.strava.com/athlete/training" target="_blank" class="text-[9px] text-gray-400 hover:text-gray-600 transition-colors">
+                    All on Strava &rarr;
+                  </a>
+                </div>
+                <input type="text" id="activity-search" placeholder="Search activities..."
+                       class="w-full px-2 py-1.5 mb-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 placeholder-gray-300">
+                <div id="activities-list" class="space-y-0"></div>
+                <button id="btn-load-more" class="w-full mt-1 py-1 text-[9px] text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded transition-colors hidden">
+                  Load 6 more months
+                </button>
+              </div>
+            </div>
+
+            <div id="tab-gpx" class="tab-panel hidden">
+              <label class="relative flex items-center justify-center w-full h-16 border border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-gray-300 transition-colors">
+                <p class="text-[11px] text-gray-400">Drop GPX or <span class="text-gray-700 underline">browse</span></p>
+                <input type="file" id="gpx-file" accept=".gpx" class="absolute inset-0 opacity-0 cursor-pointer">
+              </label>
             </div>
           </div>
 
-          <div id="tab-gpx" class="tab-panel hidden">
-            <label class="relative flex items-center justify-center w-full h-16 border border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-gray-300 transition-colors">
-              <p class="text-[11px] text-gray-400">Drop GPX or <span class="text-gray-700 underline">browse</span></p>
-              <input type="file" id="gpx-file" accept=".gpx" class="absolute inset-0 opacity-0 cursor-pointer">
-            </label>
+          <div id="mode-situate" class="mode-panel hidden">
+            <p class="text-[9px] text-gray-400 mb-2" style="line-height:1.4">Contextualize yourself in nature.</p>
+            <button id="btn-situate"
+                    class="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 transition-colors disabled:opacity-40">
+              <i class="fa-solid fa-location-crosshairs"></i> Use my location
+            </button>
           </div>
         </div>
 
@@ -230,8 +252,8 @@
       <!-- Empty state -->
       <div id="empty-state" class="panel-message">
         <div class="text-center">
-          <p class="text-sm text-gray-300 mb-1">No route loaded</p>
-          <p class="text-xs text-gray-300">Connect Strava or upload a GPX file to explore biodiversity.</p>
+          <p class="text-sm text-gray-300 mb-1">No data loaded</p>
+          <p class="text-xs text-gray-300">Use Situate to explore your surroundings, or load an activity to discover biodiversity along a route.</p>
         </div>
       </div>
     </main>

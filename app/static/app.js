@@ -28,6 +28,10 @@
   let geologyTileLayer = null;
   let activeGeoClass = null;
   let routeLocation = { city: "", state: "", country: "" };
+  let allSourcesDone = false;
+  let routePolyline = null;
+  let situateBboxRect = null;
+  let drawnItems = null;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -117,6 +121,15 @@
   let cacheReady = false;
   let searchTimer = null;
 
+  const btnLoadMore = $("#btn-load-more");
+  const activitiesRange = $("#activities-range");
+
+  function updateActivitiesLabel(months, count) {
+    if (activitiesRange) activitiesRange.textContent = `(${months} mo)`;
+    if (count !== undefined) activitySearch.placeholder = `Search ${count.toLocaleString()} activities...`;
+    if (btnLoadMore) btnLoadMore.classList.remove("hidden");
+  }
+
   async function pollCacheStatus() {
     activitySearch.placeholder = "Loading activities...";
     activitySearch.disabled = true;
@@ -127,7 +140,7 @@
         const data = await resp.json();
         if (data.ready) {
           cacheReady = true;
-          activitySearch.placeholder = `Search ${data.count.toLocaleString()} activities...`;
+          updateActivitiesLabel(data.months || 6, data.count);
           activitySearch.disabled = false;
           return;
         }
@@ -136,6 +149,28 @@
     }
     activitySearch.placeholder = "Search activities...";
     activitySearch.disabled = false;
+  }
+
+  if (btnLoadMore) {
+    btnLoadMore.addEventListener("click", async () => {
+      btnLoadMore.disabled = true;
+      btnLoadMore.textContent = "Loading...";
+      try {
+        const resp = await fetch("/api/activities/load-more", { method: "POST" });
+        if (resp.ok) {
+          const data = await resp.json();
+          const months = data.months || 12;
+          updateActivitiesLabel(months, (data.activities || []).length);
+          renderActivityRows(data.activities || []);
+          btnLoadMore.textContent = `Load 6 more months`;
+        } else {
+          btnLoadMore.textContent = "Load 6 more months";
+        }
+      } catch (_) {
+        btnLoadMore.textContent = "Load 6 more months";
+      }
+      btnLoadMore.disabled = false;
+    });
   }
 
   async function loadRecentActivities() {
@@ -212,12 +247,22 @@
     history.replaceState({}, "", "/");
   }
 
-  // ── Tabs ──
-  $$(".tab-btn").forEach((btn) => {
+  // ── Mode tabs (Activities / Situate) ──
+  $$(".mode-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      $$(".tab-btn").forEach((b) => b.classList.remove("active"));
+      $$(".mode-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      $$(".tab-panel").forEach((p) => p.classList.add("hidden"));
+      $$(".mode-panel").forEach((p) => p.classList.add("hidden"));
+      $(`#mode-${btn.dataset.mode}`).classList.remove("hidden");
+    });
+  });
+
+  // ── Strava/GPX sub-tabs ──
+  $$("#mode-activities .tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      $$("#mode-activities .tab-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      $$("#mode-activities .tab-panel").forEach((p) => p.classList.add("hidden"));
       $(`#tab-${btn.dataset.tab}`).classList.remove("hidden");
     });
   });
@@ -442,6 +487,69 @@
     } catch (e) { showError(e.message); }
   });
 
+  // ── Situate (geolocation) ──
+  const btnSituate = $("#btn-situate");
+  if (btnSituate) {
+    btnSituate.addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        showError("Geolocation is not supported by your browser.");
+        return;
+      }
+      btnSituate.disabled = true;
+      hideError();
+      closeMobileSidebar();
+      showLoading("Getting your location...");
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const latDelta = 0.0225;
+          const lngDelta = 0.0225 / Math.cos((lat * Math.PI) / 180);
+
+          routeData = {
+            name: "My Location",
+            coords: [[lat, lng]],
+            bbox: [lat - latDelta, lng - lngDelta, lat + latDelta, lng + lngDelta],
+            hull: null,
+            month: 0,
+            date: new Date().toISOString(),
+            situateMe: true,
+          };
+
+          drawnBbox = null;
+          drawnLayer = null;
+          monthSelect.value = 0;
+          btnSituate.disabled = false;
+          showResults();
+        },
+        (error) => {
+          const lat = 37.7749;
+          const lng = -122.4194;
+          const latDelta = 0.0225;
+          const lngDelta = 0.0225 / Math.cos((lat * Math.PI) / 180);
+
+          routeData = {
+            name: "San Francisco (default)",
+            coords: [[lat, lng]],
+            bbox: [lat - latDelta, lng - lngDelta, lat + latDelta, lng + lngDelta],
+            hull: null,
+            month: 0,
+            date: new Date().toISOString(),
+            situateMe: true,
+          };
+
+          drawnBbox = null;
+          drawnLayer = null;
+          monthSelect.value = 0;
+          btnSituate.disabled = false;
+          showResults();
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+  }
+
   // ── Show Results ──
   async function showResults() {
     hideLoading();
@@ -456,20 +564,26 @@
     taxaSection.classList.remove("hidden");
     routeNameEl.textContent = routeData.name;
     routeCountry.textContent = "";
+    const sep = $("#route-loc-sep");
+    if (sep) sep.classList.add("hidden");
     const geologyInfoEl = $("#geology-info");
     if (geologyInfoEl) geologyInfoEl.innerHTML = "";
     const geologyGalleryEl = $("#geology-gallery");
     if (geologyGalleryEl) { geologyGalleryEl.classList.add("hidden"); geologyGalleryEl.innerHTML = ""; }
     geologyGalleryOpen = false;
     const routeDateEl = $("#route-date");
-    if (routeDateEl && routeData.date) {
-      const d = new Date(routeData.date);
-      routeDateEl.textContent = d.toLocaleDateString("en-US", {
-        weekday: "short", month: "short", day: "numeric", year: "numeric",
-        hour: "numeric", minute: "2-digit",
-      });
-    } else if (routeDateEl) {
-      routeDateEl.textContent = "";
+    if (routeDateEl) {
+      if (routeData.situateMe) {
+        routeDateEl.textContent = "";
+      } else if (routeData.date) {
+        const d = new Date(routeData.date);
+        routeDateEl.textContent = d.toLocaleDateString("en-US", {
+          weekday: "short", month: "short", day: "numeric", year: "numeric",
+          hour: "numeric", minute: "2-digit",
+        });
+      } else {
+        routeDateEl.textContent = "";
+      }
     }
 
     // Show data source section
@@ -585,9 +699,14 @@
         routeLocation = { city: loc.city || "", state: loc.state || "", country: loc.country || "" };
         const parts = [loc.city, loc.state, loc.country].filter(Boolean);
         const locStr = parts.join(", ");
-        routeCountry.textContent = locStr;
-        const sep = $("#route-loc-sep");
-        if (sep && locStr) sep.classList.remove("hidden");
+        if (routeData && routeData.situateMe) {
+          routeNameEl.textContent = locStr || "My Location";
+          routeCountry.textContent = "";
+        } else {
+          routeCountry.textContent = locStr;
+          const sep = $("#route-loc-sep");
+          if (sep && locStr) sep.classList.remove("hidden");
+        }
       }
       const nativeLandUrl = `https://native-land.ca/maps?position=${((bbox[0]+bbox[2])/2).toFixed(4)},${((bbox[1]+bbox[3])/2).toFixed(4)},11`;
       if (data.territories && data.territories.length) {
@@ -1111,6 +1230,9 @@
     allEbirdObservations = [];
     geologyData = [];
     activeGeoClass = null;
+    allSourcesDone = false;
+    let sourcesFinished = 0;
+    const totalSources = 3;
 
     const month = parseInt(monthSelect.value, 10);
     const bbox = currentBbox();
@@ -1130,6 +1252,8 @@
 
     let rendered = false;
     function renderIfReady() {
+      sourcesFinished++;
+      if (sourcesFinished >= totalSources) allSourcesDone = true;
       if (!rendered) { speciesLoading.classList.add("hidden"); rendered = true; }
       const merged = getMergedSpeciesData();
       renderTaxaFilters(merged);
@@ -1244,7 +1368,9 @@
     }
 
     if (allSpecies.length === 0) {
-      speciesContainer.innerHTML = '<div class="panel-message"><span class="text-xs text-gray-300">No species found for current filters.</span></div>';
+      if (allSourcesDone) {
+        speciesContainer.innerHTML = '<div class="panel-message"><span class="text-xs text-gray-300">No species found for current filters.</span></div>';
+      }
       return;
     }
 
@@ -1437,16 +1563,7 @@
   }
 
   // ── Map ──
-  function renderMap(coords, bbox) {
-    if (leafletMap) { leafletMap.remove(); leafletMap = null; }
-    hullPoly = null;
-    expandedBboxPoly = null;
-    obsClusterGroup = null;
-    allObsMarkers = [];
-    ebirdClusterGroup = null;
-    ebirdMarkers = [];
-    geologyTileLayer = null;
-
+  function initMap() {
     leafletMap = L.map("map", { zoomControl: true, scrollWheelZoom: true });
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
@@ -1454,12 +1571,13 @@
       maxZoom: 19,
     }).addTo(leafletMap);
 
+    leafletMap.setView([37.7749, -122.4194], 12);
+
     geologyTileLayer = L.tileLayer("https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png", {
       opacity: 0.5,
       maxZoom: 19,
       attribution: '&copy; <a href="https://macrostrat.org">Macrostrat</a>',
     });
-    if (geologyEnabled) geologyTileLayer.addTo(leafletMap);
 
     const GeoControl = L.Control.extend({
       options: { position: "bottomleft" },
@@ -1467,9 +1585,9 @@
         const container = L.DomUtil.create("label", "geo-overlay-control");
         const cb = L.DomUtil.create("input", "", container);
         cb.type = "checkbox";
-        cb.checked = geologyEnabled;
+        cb.checked = false;
         geoOverlayCb = cb;
-        const icon = L.DomUtil.create("i", "fa-solid fa-mountain", container);
+        L.DomUtil.create("i", "fa-solid fa-mountain", container);
         const text = L.DomUtil.create("span", "", container);
         text.textContent = "Geology";
         L.DomEvent.disableClickPropagation(container);
@@ -1481,21 +1599,7 @@
 
     leafletMap.on("click", handleGeologyMapClick);
 
-    L.polyline(coords, { color: "#111827", weight: 2.5, opacity: 0.8 }).addTo(leafletMap);
-
-    const hull = routeData.hull;
-    if (hull && hull.length >= 3) {
-      hullPoly = L.polygon(hull, {
-        color: "#6b7280", weight: 1, opacity: 0.4, fillOpacity: 0.04, dashArray: "4 4",
-      }).addTo(leafletMap);
-      leafletMap.fitBounds(hullPoly.getBounds(), { padding: [30, 30] });
-    } else {
-      const bounds = [[bbox[0], bbox[1]], [bbox[2], bbox[3]]];
-      leafletMap.fitBounds(bounds, { padding: [30, 30] });
-    }
-
-    // Draw controls
-    const drawnItems = new L.FeatureGroup();
+    drawnItems = new L.FeatureGroup();
     leafletMap.addLayer(drawnItems);
 
     const drawControl = new L.Control.Draw({
@@ -1515,7 +1619,6 @@
       if (drawnLayer) drawnItems.removeLayer(drawnLayer);
       drawnLayer = e.layer;
       drawnItems.addLayer(drawnLayer);
-
       const b = drawnLayer.getBounds();
       drawnBbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()];
       loadAllSpecies();
@@ -1527,7 +1630,6 @@
       loadAllSpecies();
     });
 
-    // Observation controls
     const ObsControls = L.Control.extend({
       options: { position: "bottomright" },
       onAdd: function () {
@@ -1553,6 +1655,7 @@
         clearBtn.addEventListener("click", () => {
           showAllMarkers();
           if (hullPoly) leafletMap.fitBounds(hullPoly.getBounds(), { padding: [30, 30] });
+          else if (routeData) leafletMap.fitBounds([[routeData.bbox[0], routeData.bbox[1]], [routeData.bbox[2], routeData.bbox[3]]], { padding: [30, 30] });
           if (selectedCardEl) { selectedCardEl.classList.remove("selected"); selectedCardEl = null; }
         });
 
@@ -1560,6 +1663,52 @@
       },
     });
     new ObsControls().addTo(leafletMap);
+  }
+
+  function renderMap(coords, bbox) {
+    if (routePolyline) { leafletMap.removeLayer(routePolyline); routePolyline = null; }
+    if (hullPoly) { leafletMap.removeLayer(hullPoly); hullPoly = null; }
+    if (expandedBboxPoly) { leafletMap.removeLayer(expandedBboxPoly); expandedBboxPoly = null; }
+    if (situateBboxRect) { leafletMap.removeLayer(situateBboxRect); situateBboxRect = null; }
+    if (obsClusterGroup) { leafletMap.removeLayer(obsClusterGroup); obsClusterGroup = null; }
+    if (ebirdClusterGroup) { leafletMap.removeLayer(ebirdClusterGroup); ebirdClusterGroup = null; }
+    if (drawnLayer && drawnItems) { drawnItems.removeLayer(drawnLayer); drawnLayer = null; }
+    if (geologyEnabled && geologyTileLayer && !leafletMap.hasLayer(geologyTileLayer)) {
+      geologyTileLayer.addTo(leafletMap);
+      if (geoOverlayCb) geoOverlayCb.checked = true;
+    }
+    allObsMarkers = [];
+    ebirdMarkers = [];
+    drawnBbox = null;
+
+    if (routeData && routeData.situateMe) {
+      const sitLayers = L.layerGroup();
+      const rect = L.rectangle(
+        [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
+        { color: "#6b7280", weight: 1.5, opacity: 0.5, fillOpacity: 0.04, dashArray: "4 4" }
+      );
+      const centerLat = (bbox[0] + bbox[2]) / 2;
+      const centerLng = (bbox[1] + bbox[3]) / 2;
+      const centerDot = L.circleMarker([centerLat, centerLng], {
+        radius: 6, fillColor: "#111827", fillOpacity: 0.8, color: "#fff", weight: 2,
+      });
+      sitLayers.addLayer(rect);
+      sitLayers.addLayer(centerDot);
+      sitLayers.addTo(leafletMap);
+      situateBboxRect = sitLayers;
+      leafletMap.fitBounds(rect.getBounds(), { padding: [30, 30] });
+    } else {
+      routePolyline = L.polyline(coords, { color: "#111827", weight: 2.5, opacity: 0.8 }).addTo(leafletMap);
+      const hull = routeData.hull;
+      if (hull && hull.length >= 3) {
+        hullPoly = L.polygon(hull, {
+          color: "#6b7280", weight: 1, opacity: 0.4, fillOpacity: 0.04, dashArray: "4 4",
+        }).addTo(leafletMap);
+        leafletMap.fitBounds(hullPoly.getBounds(), { padding: [30, 30] });
+      } else {
+        leafletMap.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: [30, 30] });
+      }
+    }
   }
 
   function makeMarkerIcon(taxa) {
@@ -1732,6 +1881,7 @@
   }
 
   // ── Init ──
+  initMap();
   initSourceToggles();
   checkAuth();
 })();

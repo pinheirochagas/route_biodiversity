@@ -11,6 +11,7 @@ STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
 
 _activity_cache: dict[str, list[dict]] = {}
+_cache_months: dict[str, int] = {}
 _cache_building: set[str] = set()
 
 
@@ -80,14 +81,15 @@ def _format_activity(a: dict) -> dict:
 
 # ── Activity cache ──
 
-async def build_full_activity_cache(access_token: str, athlete_id: str, force: bool = False) -> None:
-    """Fetch last 6 months of activities from Strava and cache them."""
+async def build_full_activity_cache(access_token: str, athlete_id: str, force: bool = False, months: int = 12) -> None:
+    """Fetch activities from Strava for the given number of months and cache them."""
     if athlete_id in _cache_building:
         return
-    if not force and athlete_id in _activity_cache:
+    current_months = _cache_months.get(athlete_id, 0)
+    if not force and athlete_id in _activity_cache and months <= current_months:
         return
     _cache_building.add(athlete_id)
-    after = int((datetime.now() - timedelta(days=180)).timestamp())
+    after = int((datetime.now() - timedelta(days=months * 30)).timestamp())
     headers = {"Authorization": f"Bearer {access_token}"}
     all_activities: list[dict] = []
     try:
@@ -109,7 +111,8 @@ async def build_full_activity_cache(access_token: str, athlete_id: str, force: b
                 page += 1
         all_activities.reverse()
         _activity_cache[athlete_id] = all_activities
-        log.info("Cached %d activities for athlete %s", len(all_activities), athlete_id)
+        _cache_months[athlete_id] = months
+        log.info("Cached %d activities (%d mo) for athlete %s", len(all_activities), months, athlete_id)
     except Exception:
         log.exception("Failed to build activity cache for athlete %s", athlete_id)
     finally:
@@ -122,8 +125,8 @@ def is_cache_ready(athlete_id: str) -> bool:
 
 def get_cache_status(athlete_id: str) -> dict:
     if athlete_id in _activity_cache:
-        return {"ready": True, "count": len(_activity_cache[athlete_id])}
-    return {"ready": False, "building": athlete_id in _cache_building, "count": 0}
+        return {"ready": True, "count": len(_activity_cache[athlete_id]), "months": _cache_months.get(athlete_id, 12)}
+    return {"ready": False, "building": athlete_id in _cache_building, "count": 0, "months": 0}
 
 
 def get_cached_activities(athlete_id: str) -> list[dict]:
