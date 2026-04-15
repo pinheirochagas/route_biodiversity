@@ -1774,13 +1774,40 @@
       drawnItems.addLayer(drawnLayer);
       const b = drawnLayer.getBounds();
       drawnBbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()];
-      loadAllSpecies();
+
+      if (!routeData) {
+        const centerLat = (drawnBbox[0] + drawnBbox[2]) / 2;
+        const centerLng = (drawnBbox[1] + drawnBbox[3]) / 2;
+        routeData = {
+          name: "Custom Area",
+          coords: [[centerLat, centerLng]],
+          bbox: [...drawnBbox],
+          hull: null,
+          month: 0,
+          date: new Date().toISOString(),
+          situateMe: true,
+          fromDraw: true,
+        };
+        monthSelect.value = 0;
+        showResults();
+      } else {
+        loadAllSpecies();
+      }
     });
 
     leafletMap.on(L.Draw.Event.DELETED, () => {
       drawnBbox = null;
       drawnLayer = null;
-      loadAllSpecies();
+      if (routeData && routeData.fromDraw) {
+        routeData = null;
+        emptyState.classList.remove("hidden");
+        const infoBar = $("#route-info-bar");
+        if (infoBar) infoBar.classList.add("hidden");
+        speciesContainer.innerHTML = "";
+        document.body.classList.remove("route-loaded");
+      } else {
+        loadAllSpecies();
+      }
     });
 
     const ObsControls = L.Control.extend({
@@ -1825,16 +1852,17 @@
     if (situateBboxRect) { leafletMap.removeLayer(situateBboxRect); situateBboxRect = null; }
     if (obsClusterGroup) { leafletMap.removeLayer(obsClusterGroup); obsClusterGroup = null; }
     if (ebirdClusterGroup) { leafletMap.removeLayer(ebirdClusterGroup); ebirdClusterGroup = null; }
-    if (drawnLayer && drawnItems) { drawnItems.removeLayer(drawnLayer); drawnLayer = null; }
+    const keepDrawn = routeData && routeData.fromDraw;
+    if (!keepDrawn && drawnLayer && drawnItems) { drawnItems.removeLayer(drawnLayer); drawnLayer = null; }
     if (geologyEnabled && geologyTileLayer && !leafletMap.hasLayer(geologyTileLayer)) {
       geologyTileLayer.addTo(leafletMap);
       if (geoOverlayCb) geoOverlayCb.checked = true;
     }
     allObsMarkers = [];
     ebirdMarkers = [];
-    drawnBbox = null;
+    if (!keepDrawn) drawnBbox = null;
 
-    if (routeData && routeData.situateMe) {
+    if (routeData && routeData.situateMe && !routeData.fromDraw) {
       const sitLayers = L.layerGroup();
       const rect = L.rectangle(
         [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
