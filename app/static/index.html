@@ -91,15 +91,8 @@
           </div>
         </div>
 
-        <!-- Route Info (shown after load) -->
-        <div id="route-info" class="sidebar-section hidden">
-          <div class="sidebar-label">Loaded Route</div>
-          <div class="flex items-baseline gap-1.5">
-            <span id="route-name" class="text-xs font-medium text-gray-800 truncate"></span>
-            <span id="route-country" class="text-[10px] text-gray-400"></span>
-          </div>
-          <div id="territories" class="mt-1"></div>
-        </div>
+        <!-- Route Info (hidden, keeps JS refs working) -->
+        <div id="route-info" class="hidden"></div>
 
         <!-- Taxa filters (shown after load) — desktop only -->
         <div id="taxa-section" class="sidebar-section hidden">
@@ -163,10 +156,15 @@
 
       <!-- Route info bar -->
       <div id="route-info-bar" class="route-info-bar hidden">
-        <span id="route-name-top" class="text-xs font-medium text-gray-700"></span>
-        <span id="route-country-top" class="text-[10px] text-gray-400"></span>
-        <span class="text-[10px] text-gray-300">&middot;</span>
-        <span id="territories-top" class="text-[10px] text-gray-400"></span>
+        <div>
+          <span id="route-name" class="text-sm font-semibold text-gray-900 block"></span>
+          <div class="text-[11px] text-gray-400">
+            <span id="route-date"></span>
+            <span id="route-loc-sep" class="hidden"> &middot; </span>
+            <span id="route-country"></span>
+          </div>
+          <div id="territories" class="mt-1"></div>
+        </div>
       </div>
 
       <!-- Filters bar -->
@@ -193,6 +191,7 @@
           </select>
         </div>
         <div id="mobile-taxa-row" class="mobile-taxa-row"></div>
+        <div id="mobile-sources-row" class="mobile-taxa-row" style="display:none"></div>
       </div>
 
       <!-- Loading -->

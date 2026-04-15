@@ -60,6 +60,13 @@ async def get_valid_token(settings: Settings, token_data: dict) -> dict:
 
 
 def _format_activity(a: dict) -> dict:
+    location_parts = [
+        p for p in (
+            a.get("location_city"),
+            a.get("location_state"),
+            a.get("location_country"),
+        ) if p
+    ]
     return {
         "id": a["id"],
         "name": a.get("name", "Untitled"),
@@ -67,6 +74,7 @@ def _format_activity(a: dict) -> dict:
         "date": a.get("start_date_local", ""),
         "distance_km": round(a.get("distance", 0) / 1000, 1),
         "url": f"https://www.strava.com/activities/{a['id']}",
+        "location": ", ".join(location_parts) if location_parts else "",
     }
 
 

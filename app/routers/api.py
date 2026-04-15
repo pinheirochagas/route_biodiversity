@@ -23,7 +23,7 @@ from app.services.biodiversity import (
     fetch_all_observations,
     fetch_observations,
     fetch_indigenous_territories,
-    identify_country,
+    identify_location,
     fetch_gbif_species,
     fetch_gbif_observations,
     fetch_gbif_ebird_species,
@@ -199,8 +199,8 @@ async def get_territories(body: dict, settings: Settings = Depends(get_settings)
     territories = await fetch_indigenous_territories(
         tuple(bbox), api_key=settings.native_land_api_key
     )
-    country = await identify_country(tuple(bbox))
-    return {"territories": territories, "country": country}
+    location = await identify_location(tuple(bbox))
+    return {"territories": territories, "location": location}
 
 
 @router.post("/gbif/species")

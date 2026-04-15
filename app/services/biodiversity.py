@@ -118,16 +118,24 @@ def bbox_center(bbox: tuple) -> tuple[float, float]:
     return ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
 
 
-async def identify_country(bbox: tuple) -> str | None:
+async def identify_location(bbox: tuple) -> dict:
+    """Return {city, state, country} for the center of a bounding box."""
     lat, lng = bbox_center(bbox)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(BIGDATACLOUD_URL, params={
-            "latitude": lat, "longitude": lng, "localityLanguage": "en",
-        })
-        if resp.status_code == 200:
-            country = resp.json().get("countryName")
-            return COUNTRY_NAME_MAPPING.get(country, country)
-    return None
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(BIGDATACLOUD_URL, params={
+                "latitude": lat, "longitude": lng, "localityLanguage": "en",
+            })
+            if resp.status_code == 200:
+                data = resp.json()
+                country = data.get("countryName") or ""
+                country = COUNTRY_NAME_MAPPING.get(country, country)
+                city = data.get("city") or data.get("locality") or ""
+                state = data.get("principalSubdivision") or ""
+                return {"city": city, "state": state, "country": country}
+    except Exception:
+        pass
+    return {"city": "", "state": "", "country": ""}
 
 
 async def fetch_indigenous_territories(bbox: tuple, api_key: str = "") -> list[dict]:

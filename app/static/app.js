@@ -151,8 +151,9 @@
       const row = document.createElement("button");
       row.type = "button";
       row.className = "w-full flex items-center justify-between px-1.5 py-1.5 rounded text-left hover:bg-gray-50 transition-colors group";
+      const loc = a.location ? `<span class="text-[9px] text-gray-400 truncate block">${a.location}</span>` : "";
       row.innerHTML =
-        `<span class="text-[11px] text-gray-600 group-hover:text-gray-900 truncate mr-1">${a.name}</span>` +
+        `<div class="truncate mr-1 flex-1 min-w-0"><span class="text-[11px] text-gray-600 group-hover:text-gray-900 truncate block">${a.name}</span>${loc}</div>` +
         `<span class="text-[9px] text-gray-400 flex-shrink-0">${dateStr}</span>`;
       row.addEventListener("click", () => {
         activityUrl.value = a.url;
@@ -435,13 +436,23 @@
 
     const infoBar = $("#route-info-bar");
     infoBar.classList.remove("hidden");
-    $("#route-name-top").textContent = routeData.name;
 
     filtersSection.classList.remove("hidden");
 
     routeInfoEl.classList.remove("hidden");
     taxaSection.classList.remove("hidden");
     routeNameEl.textContent = routeData.name;
+    routeCountry.textContent = "";
+    const routeDateEl = $("#route-date");
+    if (routeDateEl && routeData.date) {
+      const d = new Date(routeData.date);
+      routeDateEl.textContent = d.toLocaleDateString("en-US", {
+        weekday: "short", month: "short", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit",
+      });
+    } else if (routeDateEl) {
+      routeDateEl.textContent = "";
+    }
 
     // Show data source section
     if (sourcesSection) sourcesSection.classList.remove("hidden");
@@ -463,6 +474,7 @@
 
     document.body.classList.add("route-loaded");
     closeMobileSidebar();
+    renderMobileSources();
     setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 200);
 
     renderMap(routeData.coords, routeData.bbox);
@@ -470,12 +482,66 @@
     loadAllSpecies();
   }
 
+  function renderMobileSources() {
+    const row = $("#mobile-sources-row");
+    if (!row) return;
+    row.style.display = "";
+    row.innerHTML = "";
+
+    const sources = [
+      { key: "inat", label: "iNat", icon: "fa-binoculars", color: "#74ac00" },
+      { key: "gbif", label: "GBIF", icon: "fa-database", color: "#8b5cf6" },
+      { key: "ebird", label: "eBird", icon: "fa-dove", color: "#3b82f6" },
+    ];
+    for (const s of sources) {
+      const pill = document.createElement("span");
+      pill.className = "mobile-taxa-pill active";
+      pill.dataset.source = s.key;
+      pill.innerHTML = `<i class="fa-solid ${s.icon}" style="color:${s.color}"></i> ${s.label}`;
+      pill.addEventListener("click", () => {
+        if (s.key === "inat") { inatEnabled = !inatEnabled; pill.classList.toggle("active", inatEnabled); }
+        else if (s.key === "gbif") { gbifEnabled = !gbifEnabled; pill.classList.toggle("active", gbifEnabled); }
+        else if (s.key === "ebird") {
+          ebirdEnabled = !ebirdEnabled;
+          pill.classList.toggle("active", ebirdEnabled);
+          if (ebirdEnabled) renderEbirdMarkers(allEbirdObservations);
+          else if (ebirdClusterGroup && leafletMap) leafletMap.removeLayer(ebirdClusterGroup);
+        }
+        const dtoggle = $(`[data-source="${s.key}"]`);
+        if (dtoggle) { dtoggle.classList.toggle("active"); dtoggle.classList.toggle("off"); }
+        const merged = getMergedSpeciesData();
+        renderTaxaFilters(merged);
+        renderSpeciesCards();
+      });
+      row.appendChild(pill);
+    }
+
+    const ebirdSel = document.createElement("select");
+    ebirdSel.className = "filter-select";
+    ebirdSel.style.fontSize = "10px";
+    ebirdSel.innerHTML = `<option value="7">7d</option><option value="14">14d</option><option value="30" selected>30d</option><option value="all">All time</option>`;
+    ebirdSel.addEventListener("change", () => {
+      if (ebirdBackSelect) ebirdBackSelect.value = ebirdSel.value;
+      if (routeData) reloadEbird();
+    });
+    row.appendChild(ebirdSel);
+
+    const bboxSel = document.createElement("select");
+    bboxSel.className = "filter-select";
+    bboxSel.style.fontSize = "10px";
+    bboxSel.innerHTML = `<option value="0" selected>Route only</option><option value="25">+25%</option><option value="50">+50%</option><option value="100">+100%</option><option value="200">+200%</option>`;
+    bboxSel.addEventListener("change", () => {
+      if (bboxExpandSelect) bboxExpandSelect.value = bboxSel.value;
+      if (!routeData) return;
+      drawExpandedBbox();
+      loadAllSpecies();
+    });
+    row.appendChild(bboxSel);
+  }
+
   // ── Territories ──
   async function fetchTerritories(bbox) {
     territoriesEl.innerHTML = '<span class="text-gray-300" style="font-size:9px">Loading territories...</span>';
-    routeCountry.textContent = "";
-    const countryTop = $("#route-country-top");
-    const terrTop = $("#territories-top");
     try {
       const resp = await fetch("/api/territories", {
         method: "POST",
@@ -483,9 +549,13 @@
         body: JSON.stringify({ bbox }),
       });
       const data = await resp.json();
-      if (data.country) {
-        routeCountry.textContent = data.country;
-        if (countryTop) countryTop.textContent = data.country;
+      if (data.location) {
+        const loc = data.location;
+        const parts = [loc.city, loc.state, loc.country].filter(Boolean);
+        const locStr = parts.join(", ");
+        routeCountry.textContent = locStr;
+        const sep = $("#route-loc-sep");
+        if (sep && locStr) sep.classList.remove("hidden");
       }
       const nativeLandUrl = `https://native-land.ca/maps?position=${((bbox[0]+bbox[2])/2).toFixed(4)},${((bbox[1]+bbox[3])/2).toFixed(4)},11`;
       if (data.territories && data.territories.length) {
@@ -494,15 +564,12 @@
           .join(" ");
         const prefix = '<span style="font-size:10px;color:#6b7280;font-weight:500">Native Land: </span>';
         territoriesEl.innerHTML = prefix + links;
-        if (terrTop) terrTop.innerHTML = prefix + links;
       } else {
         const fallback = `<a href="${nativeLandUrl}" target="_blank" class="territory-link">Explore on Native Land &rarr;</a>`;
         territoriesEl.innerHTML = fallback;
-        if (terrTop) terrTop.innerHTML = fallback;
       }
     } catch (_) {
       territoriesEl.innerHTML = "";
-      if (terrTop) terrTop.innerHTML = "";
     }
   }
 
