@@ -31,7 +31,10 @@ from app.services.biodiversity import (
 )
 from app.services.ebird import fetch_recent_observations, fetch_notable_observations, enrich_with_photos
 from app.services.geology import fetch_geology_along_route, fetch_geology_at_point
-from app.services.climate import fetch_temperature_history
+from app.services.climate import (
+    fetch_temperature_history, fetch_ndvi_history,
+    get_ndvi_trend_tile_url, get_temperature_trend_tile_url,
+)
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -260,6 +263,52 @@ async def get_climate(body: dict, settings: Settings = Depends(get_settings)):
 
     data = await fetch_temperature_history(
         lat, lon,
+        service_account=settings.gee_service_account,
+        key_file=settings.gee_key_file,
+        project=settings.gee_project,
+        key_json=settings.gee_key_json,
+    )
+    return data
+
+
+@router.post("/climate/ndvi")
+async def get_climate_ndvi(body: dict, settings: Settings = Depends(get_settings)):
+    bbox = body.get("bbox")
+    if not bbox or len(bbox) != 4:
+        raise HTTPException(400, "bbox must be [swlat, swlng, nelat, nelng]")
+    if not settings.gee_service_account or (not settings.gee_key_file and not settings.gee_key_json):
+        return {"error": "Google Earth Engine not configured"}
+
+    data = await fetch_ndvi_history(
+        bbox,
+        service_account=settings.gee_service_account,
+        key_file=settings.gee_key_file,
+        project=settings.gee_project,
+        key_json=settings.gee_key_json,
+    )
+    return data
+
+
+@router.post("/climate/ndvi-tiles")
+async def get_ndvi_tiles(body: dict, settings: Settings = Depends(get_settings)):
+    if not settings.gee_service_account or (not settings.gee_key_file and not settings.gee_key_json):
+        return {"error": "Google Earth Engine not configured"}
+
+    data = get_ndvi_trend_tile_url(
+        service_account=settings.gee_service_account,
+        key_file=settings.gee_key_file,
+        project=settings.gee_project,
+        key_json=settings.gee_key_json,
+    )
+    return data
+
+
+@router.post("/climate/temp-tiles")
+async def get_temp_tiles(body: dict, settings: Settings = Depends(get_settings)):
+    if not settings.gee_service_account or (not settings.gee_key_file and not settings.gee_key_json):
+        return {"error": "Google Earth Engine not configured"}
+
+    data = get_temperature_trend_tile_url(
         service_account=settings.gee_service_account,
         key_file=settings.gee_key_file,
         project=settings.gee_project,

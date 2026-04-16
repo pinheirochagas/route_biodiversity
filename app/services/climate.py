@@ -111,7 +111,7 @@ async def fetch_temperature_history(
 
     current_anomaly = anomalies[-1]["anomaly"] if anomalies else None
 
-    warming_rate = _compute_warming_rate(anomalies)
+    warming_rate = _compute_trend_per_decade(anomalies)
 
     return {
         "dataset": dataset,
@@ -124,9 +124,9 @@ async def fetch_temperature_history(
     }
 
 
-def _compute_warming_rate(anomalies: list) -> Optional[float]:
-    """Linear regression slope in C per decade over the full record."""
-    valid = [(a["year"], a["anomaly"]) for a in anomalies if a["anomaly"] is not None]
+def _compute_trend_per_decade(values: list, year_key: str = "year", val_key: str = "anomaly") -> Optional[float]:
+    """Linear regression slope per decade over the full record."""
+    valid = [(a[year_key], a[val_key]) for a in values if a.get(val_key) is not None]
     n = len(valid)
     if n < 10:
         return None
@@ -138,4 +138,208 @@ def _compute_warming_rate(anomalies: list) -> Optional[float]:
     if denom == 0:
         return None
     slope = (n * sum_xy - sum_x * sum_y) / denom
-    return round(slope * 10, 3)
+    return round(slope * 10, 4)
+
+
+async def fetch_ndvi_history(
+    bbox: list,
+    service_account: str,
+    key_file: str,
+    project: str,
+    key_json: str = "",
+    start_year: int = 2000,
+    end_year: int = 2024,
+) -> dict:
+    """
+    Fetch yearly mean NDVI averaged across all pixels in bbox.
+    Uses MODIS MOD13A2 (1km, global, 2000-present).
+    Returns yearly values + anomalies relative to 2001-2010 baseline.
+    bbox: [swlat, swlng, nelat, nelng]
+    """
+    _init_ee(service_account, key_file, project, key_json=key_json)
+
+    region = ee.Geometry.Rectangle([bbox[1], bbox[0], bbox[3], bbox[2]])
+    collection = ee.ImageCollection("MODIS/061/MOD13A2")
+    actual_start = max(start_year, 2000)
+    years = list(range(actual_start, end_year + 1))
+
+    def yearly_mean_ndvi(year):
+        y = ee.Number(year)
+        imgs = collection.filter(ee.Filter.calendarRange(y, y, "year"))
+
+        def mask_quality(img):
+            good = img.select("SummaryQA").eq(0)
+            return img.select("NDVI").updateMask(good)
+
+        masked = imgs.map(mask_quality)
+        mean_val = masked.mean().multiply(0.0001).reduceRegion(
+            ee.Reducer.mean(), region, 1000, maxPixels=1e7
+        ).get("NDVI")
+        return ee.Feature(None, {"year": y, "ndvi": mean_val})
+
+    fc = ee.FeatureCollection([yearly_mean_ndvi(y) for y in years])
+    data = fc.getInfo()
+
+    yearly_ndvi = []
+    for f in data["features"]:
+        p = f["properties"]
+        if p.get("ndvi") is not None:
+            yearly_ndvi.append({
+                "year": int(p["year"]),
+                "ndvi": round(p["ndvi"], 4),
+            })
+
+    if not yearly_ndvi:
+        return {
+            "dataset": "MODIS MOD13A2",
+            "resolution_m": 1000,
+            "years": [],
+            "baseline_mean": None,
+            "current_anomaly": None,
+            "trend_per_decade": None,
+        }
+
+    baseline = [v["ndvi"] for v in yearly_ndvi if 2001 <= v["year"] <= 2010]
+    baseline_mean = round(sum(baseline) / len(baseline), 4) if baseline else None
+
+    for v in yearly_ndvi:
+        v["anomaly"] = round(v["ndvi"] - baseline_mean, 4) if baseline_mean is not None else None
+
+    current_anomaly = yearly_ndvi[-1]["anomaly"] if yearly_ndvi else None
+    trend = _compute_trend_per_decade(yearly_ndvi)
+
+    return {
+        "dataset": "MODIS MOD13A2",
+        "resolution_m": 1000,
+        "baseline_period": "2001-2010",
+        "baseline_mean": baseline_mean,
+        "current_anomaly": current_anomaly,
+        "trend_per_decade": trend,
+        "years": yearly_ndvi,
+    }
+
+
+def get_ndvi_trend_tile_url(
+    service_account: str,
+    key_file: str,
+    project: str,
+    key_json: str = "",
+) -> dict:
+    """
+    Generate a GEE tile URL showing per-pixel NDVI linear trend (2001-2024)
+    at 250m resolution (MOD13Q1). Pre-aggregates to annual composites (24 images)
+    before linearFit for fast tile rendering with negligible quality loss.
+    """
+    _init_ee(service_account, key_file, project, key_json=key_json)
+
+    collection = ee.ImageCollection("MODIS/061/MOD13Q1")
+
+    def mask_quality(img):
+        good = img.select("SummaryQA").eq(0)
+        return img.select("NDVI").updateMask(good)
+
+    masked = collection.filterDate("2001-01-01", "2025-01-01").map(mask_quality)
+
+    years = list(range(2001, 2025))
+    annual_images = []
+    for yr in years:
+        annual = masked.filterDate(f"{yr}-01-01", f"{yr + 1}-01-01").mean().multiply(0.0001)
+        t_val = yr - 2001
+        with_time = annual.addBands(ee.Image.constant(t_val).float().rename("t"))
+        annual_images.append(with_time)
+
+    annual_col = ee.ImageCollection(annual_images)
+
+    trend = annual_col.select(["t", "NDVI"]).reduce(ee.Reducer.linearFit())
+    slope = trend.select("scale")
+    slope_decade = slope.multiply(10)
+
+    vis_params = {
+        "min": -0.05,
+        "max": 0.05,
+        "palette": [
+            "#8B0000", "#D32F2F", "#E57373", "#FFCDD2",
+            "#F5F5F5",
+            "#C8E6C9", "#66BB6A", "#2E7D32", "#1B5E20",
+        ],
+    }
+
+    map_id = slope_decade.getMapId(vis_params)
+    tile_url = map_id["tile_fetcher"].url_format
+
+    return {
+        "tile_url": tile_url,
+        "dataset": "MODIS MOD13Q1 trend",
+        "resolution_m": 250,
+        "period": "2001-2024",
+        "units": "NDVI change per decade",
+    }
+
+
+def get_temperature_trend_tile_url(
+    service_account: str,
+    key_file: str,
+    project: str,
+    key_json: str = "",
+) -> dict:
+    """
+    Per-pixel air temperature trend mosaic:
+    PRISM (800m, CONUS, 1895-present) on top of ERA5-Land (11km, global, 1950-present).
+    Both use annual means → linearFit for the trend.
+    """
+    _init_ee(service_account, key_file, project, key_json=key_json)
+
+    years = list(range(1981, 2025))
+    band_name = "temp"
+
+    # PRISM: already annual, just select tmean (CONUS only, 800m)
+    prism = ee.ImageCollection("OREGONSTATE/PRISM/ANm").select("tmean")
+    prism_annual = []
+    for yr in years:
+        img = prism.filter(ee.Filter.calendarRange(yr, yr, "year")).mean()
+        t_val = yr - years[0]
+        prism_annual.append(
+            img.rename(band_name).addBands(ee.Image.constant(t_val).float().rename("t"))
+        )
+
+    prism_trend = ee.ImageCollection(prism_annual).select(["t", band_name]).reduce(
+        ee.Reducer.linearFit()
+    ).select("scale").multiply(10)  # C per decade
+
+    # ERA5-Land: monthly → annual mean, convert K to C (global, 11km)
+    era5 = ee.ImageCollection("ECMWF/ERA5_LAND/MONTHLY_AGGR").select("temperature_2m")
+    era5_annual = []
+    for yr in years:
+        img = era5.filter(ee.Filter.calendarRange(yr, yr, "year")).mean().subtract(273.15)
+        t_val = yr - years[0]
+        era5_annual.append(
+            img.rename(band_name).addBands(ee.Image.constant(t_val).float().rename("t"))
+        )
+
+    era5_trend = ee.ImageCollection(era5_annual).select(["t", band_name]).reduce(
+        ee.Reducer.linearFit()
+    ).select("scale").multiply(10)
+
+    # Mosaic: PRISM (high-res) on top, ERA5-Land fills everywhere else
+    mosaic = ee.ImageCollection([era5_trend, prism_trend]).mosaic()
+
+    vis_params = {
+        "min": -0.5,
+        "max": 0.5,
+        "palette": [
+            "#08519c", "#3182bd", "#6baed6", "#bdd7e7",
+            "#F5F5F5",
+            "#fcae91", "#fb6a4a", "#cb181d", "#67000d",
+        ],
+    }
+
+    map_id = mosaic.getMapId(vis_params)
+    tile_url = map_id["tile_fetcher"].url_format
+
+    return {
+        "tile_url": tile_url,
+        "dataset": "PRISM 800m + ERA5-Land 11km",
+        "resolution_m": 800,
+        "period": "1981-2024",
+        "units": "°C change per decade",
+    }

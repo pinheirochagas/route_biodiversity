@@ -36,6 +36,9 @@
   let currentBirdsongBtn = null;
   let climateEnabled = true;
   let climateData = null;
+  let ndviData = null;
+  let ndviTileLayer = null;
+  let tempTileLayer = null;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -430,6 +433,17 @@
     });
   }
 
+  // ── Climate collapse toggle ──
+  const climateHeader = $("#climate-header");
+  if (climateHeader) {
+    climateHeader.addEventListener("click", () => {
+      const body = $("#climate-body");
+      if (!body) return;
+      const collapsed = body.classList.toggle("collapsed");
+      climateHeader.classList.toggle("collapsed", collapsed);
+    });
+  }
+
   // ── eBird time-range filter handler ──
   if (ebirdBackSelect) {
     ebirdBackSelect.addEventListener("change", (e) => {
@@ -751,6 +765,9 @@
     geologyEnabled = true;
     climateEnabled = true;
     climateData = null;
+    ndviData = null;
+    if (ndviTileLayer && leafletMap) { leafletMap.removeLayer(ndviTileLayer); ndviTileLayer = null; }
+    if (tempTileLayer && leafletMap) { leafletMap.removeLayer(tempTileLayer); tempTileLayer = null; }
     gbifSpeciesData = {};
     ebirdSpeciesData = {};
     allEbirdObservations = [];
@@ -777,7 +794,10 @@
     renderMap(routeData.coords, routeData.bbox);
     const locationReady = fetchTerritories(routeData.bbox);
     loadAllSpecies(locationReady);
-    if (climateEnabled) fetchClimateData(routeData.bbox);
+    if (climateEnabled) {
+      fetchClimateData(routeData.bbox);
+      fetchNdviData(routeData.bbox);
+    }
   }
 
   function renderMobileSources() {
@@ -791,7 +811,7 @@
       { key: "gbif", label: "GBIF", icon: "fa-database", color: "#8b5cf6" },
       { key: "ebird", label: "eBird", icon: "fa-dove", color: "#3b82f6" },
       { key: "geology", label: "Geology", icon: "fa-mountain", color: "#a3724e" },
-      { key: "climate", label: "Climate", icon: "fa-temperature-arrow-up", color: "#ef4444" },
+      { key: "climate", label: "Environment", icon: "fa-earth-americas", color: "#ef4444" },
     ];
     for (const s of sources) {
       const pill = document.createElement("span");
@@ -1837,6 +1857,151 @@
     }
   }
 
+  // ── Temperature trend tiles ──
+  async function fetchTempTiles() {
+    try {
+      const resp = await fetch("/api/climate/temp-tiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await resp.json();
+      if (data.tile_url && leafletMap) {
+        tempTileLayer = L.tileLayer(data.tile_url, {
+          opacity: 0.45,
+          maxZoom: 18,
+          attribution: "MODIS LST 1km &copy; NASA/Google Earth Engine",
+        });
+        const tempCb = document.querySelector('.map-layer-row input[data-layer="temp"]');
+        if (tempCb && tempCb.checked) tempTileLayer.addTo(leafletMap);
+      }
+    } catch (_) {}
+  }
+
+  // ── NDVI data ──
+  async function fetchNdviData(bbox) {
+    try {
+      const [tsResp, tileResp] = await Promise.allSettled([
+        fetch("/api/climate/ndvi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bbox }),
+        }),
+        fetch("/api/climate/ndvi-tiles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ year: 2024 }),
+        }),
+      ]);
+
+      if (tsResp.status === "fulfilled" && tsResp.value.ok) {
+        const data = await tsResp.value.json();
+        if (!data.error) {
+          ndviData = data;
+          if (climateEnabled) renderNdviSection(data);
+        }
+      }
+
+      if (tileResp.status === "fulfilled" && tileResp.value.ok) {
+        const tileData = await tileResp.value.json();
+        if (tileData.tile_url && leafletMap) {
+          if (ndviTileLayer) leafletMap.removeLayer(ndviTileLayer);
+          ndviTileLayer = L.tileLayer(tileData.tile_url, {
+            opacity: 0.45,
+            maxZoom: 18,
+            attribution: "MODIS NDVI 250m &copy; NASA/Google Earth Engine",
+          });
+          const ndviCb = document.querySelector('.map-layer-row input[data-layer="ndvi"]');
+          if (ndviCb && ndviCb.checked) ndviTileLayer.addTo(leafletMap);
+        }
+      }
+    } catch (_) {}
+  }
+
+  function renderNdviSection(data) {
+    if (!data || !data.years || data.years.length === 0) return;
+
+    const anomalyEl = $("#ndvi-stat-anomaly .climate-stat-value");
+    const rateEl = $("#ndvi-stat-rate .climate-stat-value");
+    const datasetEl = $("#ndvi-stat-dataset .climate-stat-value");
+
+    if (anomalyEl && data.current_anomaly != null) {
+      const sign = data.current_anomaly >= 0 ? "+" : "";
+      anomalyEl.textContent = `${sign}${data.current_anomaly.toFixed(4)}`;
+      anomalyEl.style.color = data.current_anomaly >= 0 ? "#16a34a" : "#92400e";
+    }
+    if (rateEl && data.trend_per_decade != null) {
+      const sign = data.trend_per_decade >= 0 ? "+" : "";
+      rateEl.textContent = `${sign}${data.trend_per_decade.toFixed(4)}`;
+      rateEl.style.color = data.trend_per_decade >= 0 ? "#16a34a" : "#92400e";
+    }
+    if (datasetEl) {
+      datasetEl.textContent = data.dataset || "—";
+    }
+
+    const startEl = $("#ndvi-year-start");
+    const endEl = $("#ndvi-year-end");
+    if (startEl) startEl.textContent = data.years[0].year;
+    if (endEl) endEl.textContent = data.years[data.years.length - 1].year;
+
+    renderNdviStripes(data.years);
+  }
+
+  function renderNdviStripes(years) {
+    const canvas = $("#ndvi-stripes");
+    if (!canvas || !years.length) return;
+
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const displayW = canvas.clientWidth || 800;
+    const displayH = canvas.clientHeight || 100;
+    canvas.width = displayW * dpr;
+    canvas.height = displayH * dpr;
+    ctx.scale(dpr, dpr);
+
+    const anomalies = years.map((y) => y.anomaly).filter((a) => a != null);
+    const maxAbs = Math.max(Math.abs(Math.min(...anomalies)), Math.abs(Math.max(...anomalies)), 0.01);
+    const stripeW = displayW / years.length;
+
+    for (let i = 0; i < years.length; i++) {
+      const a = years[i].anomaly;
+      if (a == null) {
+        ctx.fillStyle = "#e5e7eb";
+      } else {
+        const t = Math.max(-1, Math.min(1, a / maxAbs));
+        ctx.fillStyle = ndviColor(t);
+      }
+      ctx.fillRect(i * stripeW, 0, stripeW + 0.5, displayH);
+    }
+
+    canvas.title = `NDVI: ${years[0].year}–${years[years.length - 1].year}`;
+    canvas.onmousemove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const idx = Math.floor((x / rect.width) * years.length);
+      if (idx >= 0 && idx < years.length) {
+        const y = years[idx];
+        const sign = y.anomaly >= 0 ? "+" : "";
+        canvas.title = `${y.year}: NDVI ${y.ndvi.toFixed(4)} (${sign}${y.anomaly.toFixed(4)})`;
+      }
+    };
+  }
+
+  function ndviColor(t) {
+    if (t >= 0) {
+      const r = Math.round(255 * (1 - t * 0.85));
+      const g = Math.round(255 * (1 - t * 0.15));
+      const b = Math.round(255 * (1 - t * 0.85));
+      return `rgb(${r},${g},${b})`;
+    } else {
+      const abs = Math.abs(t);
+      const r = Math.round(255 * (1 - abs * 0.15));
+      const g = Math.round(255 * (1 - abs * 0.55));
+      const b = Math.round(255 * (1 - abs * 0.75));
+      return `rgb(${r},${g},${b})`;
+    }
+  }
+
   // ── Focus eBird species on map ──
   function focusEbirdSpeciesOnMap(scientificName) {
     if (!leafletMap || !allEbirdObservations.length) return;
@@ -1973,28 +2138,59 @@
     leafletMap.setView([37.7749, -122.4194], 12);
 
     geologyTileLayer = L.tileLayer("https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png", {
-      opacity: 0.5,
+      opacity: 0.3,
       maxZoom: 19,
       attribution: '&copy; <a href="https://macrostrat.org">Macrostrat</a>',
     });
 
-    const GeoControl = L.Control.extend({
+    const LayerLegend = L.Control.extend({
       options: { position: "bottomleft" },
       onAdd: function () {
-        const container = L.DomUtil.create("label", "geo-overlay-control");
-        const cb = L.DomUtil.create("input", "", container);
-        cb.type = "checkbox";
-        cb.checked = false;
-        geoOverlayCb = cb;
-        L.DomUtil.create("i", "fa-solid fa-mountain", container);
-        const text = L.DomUtil.create("span", "", container);
-        text.textContent = "Geology";
-        L.DomEvent.disableClickPropagation(container);
-        cb.addEventListener("change", toggleGeologyLayer);
-        return container;
+        const wrap = L.DomUtil.create("div", "map-layer-legend");
+        L.DomEvent.disableClickPropagation(wrap);
+
+        const layers = [
+          { id: "geology", label: "Geology", icon: "fa-mountain", color: "#a3724e", checked: false },
+          { id: "temp", label: "Temp. trend", icon: "fa-temperature-half", color: "#ef4444", checked: false },
+          { id: "ndvi", label: "Veg. trend", icon: "fa-leaf", color: "#16a34a", checked: false },
+        ];
+
+        for (const lyr of layers) {
+          const row = L.DomUtil.create("label", "map-layer-row", wrap);
+          const cb = L.DomUtil.create("input", "", row);
+          cb.type = "checkbox";
+          cb.checked = lyr.checked;
+          cb.dataset.layer = lyr.id;
+          const icon = L.DomUtil.create("i", `fa-solid ${lyr.icon}`, row);
+          icon.style.color = lyr.color;
+          const text = L.DomUtil.create("span", "", row);
+          text.textContent = lyr.label;
+
+          if (lyr.id === "geology") {
+            geoOverlayCb = cb;
+            cb.addEventListener("change", toggleGeologyLayer);
+          } else if (lyr.id === "ndvi") {
+            cb.addEventListener("change", () => {
+              if (!leafletMap || !ndviTileLayer) return;
+              if (cb.checked) ndviTileLayer.addTo(leafletMap);
+              else leafletMap.removeLayer(ndviTileLayer);
+            });
+          } else if (lyr.id === "temp") {
+            cb.addEventListener("change", () => {
+              if (!leafletMap) return;
+              if (cb.checked) {
+                if (!tempTileLayer) fetchTempTiles();
+                else tempTileLayer.addTo(leafletMap);
+              } else if (tempTileLayer) {
+                leafletMap.removeLayer(tempTileLayer);
+              }
+            });
+          }
+        }
+        return wrap;
       },
     });
-    leafletMap.addControl(new GeoControl());
+    leafletMap.addControl(new LayerLegend());
 
     leafletMap.on("click", handleGeologyMapClick);
 
@@ -2100,9 +2296,8 @@
     if (ebirdClusterGroup) { leafletMap.removeLayer(ebirdClusterGroup); ebirdClusterGroup = null; }
     const keepDrawn = routeData && routeData.fromDraw;
     if (!keepDrawn && drawnLayer && drawnItems) { drawnItems.removeLayer(drawnLayer); drawnLayer = null; }
-    if (geologyEnabled && geologyTileLayer && !leafletMap.hasLayer(geologyTileLayer)) {
+    if (geologyEnabled && geologyTileLayer && geoOverlayCb && geoOverlayCb.checked && !leafletMap.hasLayer(geologyTileLayer)) {
       geologyTileLayer.addTo(leafletMap);
-      if (geoOverlayCb) geoOverlayCb.checked = true;
     }
     allObsMarkers = [];
     ebirdMarkers = [];
