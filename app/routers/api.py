@@ -252,7 +252,7 @@ async def get_climate(body: dict, settings: Settings = Depends(get_settings)):
     bbox = body.get("bbox")
     if not bbox or len(bbox) != 4:
         raise HTTPException(400, "bbox must be [swlat, swlng, nelat, nelng]")
-    if not settings.gee_service_account or not settings.gee_key_file:
+    if not settings.gee_service_account or (not settings.gee_key_file and not settings.gee_key_json):
         return {"error": "Google Earth Engine not configured"}
 
     lat = (bbox[0] + bbox[2]) / 2
