@@ -1,3 +1,17 @@
+window.retryImg = function (img) {
+  if (!img.dataset.startTime) img.dataset.startTime = Date.now();
+  if (Date.now() - parseInt(img.dataset.startTime) > 60000) {
+    img.onerror = null;
+    return;
+  }
+  var retries = parseInt(img.dataset.retries || "0", 10);
+  img.dataset.retries = retries + 1;
+  var src = img.src;
+  img.src = "";
+  var delay = Math.min(2000 * Math.pow(1.5, retries), 15000);
+  setTimeout(function () { img.src = src; }, delay);
+};
+
 (function () {
   "use strict";
 
@@ -1326,7 +1340,7 @@
       const mindatUrl = r.mindat_id ? `https://www.mindat.org/min-${r.mindat_id}.html` : "";
 
       card.innerHTML = `
-        ${r.photo_url ? `<img class="geology-card-img" src="${r.photo_url}" alt="${r.term}" loading="lazy">` : '<div class="geology-card-img"></div>'}
+        ${r.photo_url ? `<img class="geology-card-img" src="${r.photo_url}" alt="${r.term}" loading="lazy" data-retries="0" onerror="retryImg(this)">` : '<div class="geology-card-img"></div>'}
         <div class="geology-card-body">
           ${clsLabel ? `<div class="rock-class" style="color:${clsColor}">${clsLabel} ${srcBadge}</div>` : srcBadge}
           <div class="rock-name" style="border-left:3px solid ${r.color};padding-left:5px">${r.term}</div>
@@ -1601,7 +1615,9 @@
         : "";
 
       card.innerHTML = `
-        ${sp.photo_url ? `<img class="species-card-img" src="${sp.photo_url}" alt="${sp.common_name || sp.name}" loading="lazy">` : '<div class="species-card-img"></div>'}
+        ${sp.photo_url
+          ? `<img class="species-card-img" src="${sp.photo_url}" alt="${sp.common_name || sp.name}" loading="lazy" data-retries="0" onerror="retryImg(this)">`
+          : `<div class="species-card-img" data-sciname="${sp.name}"></div>`}
         <div class="species-card-body">
           <div class="common-name">${sp.common_name || sp.name}</div>
           ${sp.common_name ? `<div class="sci-name">${sp.name}</div>` : ""}
@@ -1646,6 +1662,40 @@
       });
 
       speciesContainer.appendChild(card);
+    }
+
+    fillMissingPhotos();
+  }
+
+  async function fillMissingPhotos() {
+    const placeholders = document.querySelectorAll('.species-card-img[data-sciname]');
+    if (!placeholders.length) return;
+    for (const div of placeholders) {
+      const name = div.dataset.sciname;
+      if (!name) continue;
+      try {
+        const resp = await fetch(`https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(name)}&per_page=3&is_active=true`);
+        if (!resp.ok) continue;
+        const data = await resp.json();
+        const nameLower = name.toLowerCase();
+        for (const taxon of (data.results || [])) {
+          if ((taxon.name || "").toLowerCase() === nameLower) {
+            const photo = taxon.default_photo || {};
+            const url = photo.medium_url || photo.square_url || "";
+            if (url) {
+              const img = document.createElement("img");
+              img.className = "species-card-img";
+              img.src = url;
+              img.alt = name;
+              img.loading = "lazy";
+              img.dataset.retries = "0";
+              img.onerror = function () { window.retryImg(this); };
+              div.replaceWith(img);
+            }
+            break;
+          }
+        }
+      } catch (_) {}
     }
   }
 

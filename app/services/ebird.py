@@ -144,6 +144,8 @@ async def fetch_notable_observations(
 
 INAT_TAXA_URL = "https://api.inaturalist.org/v1/taxa"
 
+_photo_cache: dict[str, str] = {}
+
 
 async def _fetch_photo_for_name(
     client: httpx.AsyncClient,
@@ -192,7 +194,8 @@ async def _fetch_photo_for_name(
 
 
 async def enrich_with_photos(observations: list[dict]) -> list[dict]:
-    """Fetch species photos from iNaturalist for eBird observations."""
+    """Fetch species photos from iNaturalist for eBird observations.
+    Retries up to 3 rounds for any species still missing a photo."""
     names = list({
         o.get("scientific_name", "")
         for o in observations if o.get("scientific_name")
@@ -200,33 +203,36 @@ async def enrich_with_photos(observations: list[dict]) -> list[dict]:
     if not names:
         return observations
 
-    sem = asyncio.Semaphore(8)
+    sem = asyncio.Semaphore(10)
 
     async def _limited(client: httpx.AsyncClient, n: str):
         async with sem:
             return await _fetch_photo_for_name(client, n)
 
-    async with httpx.AsyncClient(timeout=15) as client:
-        results = await asyncio.gather(
-            *[_limited(client, n) for n in names],
-            return_exceptions=True,
-        )
-
     photo_map: dict[str, str] = {}
-    for r in results:
-        if isinstance(r, tuple) and r[1]:
-            photo_map[r[0]] = r[1]
+    for n in names:
+        cached = _photo_cache.get(n.lower())
+        if cached:
+            photo_map[n.lower()] = cached
 
-    missing = [n for n in names if n.lower() not in photo_map]
-    if missing:
-        async with httpx.AsyncClient(timeout=15) as client2:
-            retry_results = await asyncio.gather(
-                *[_limited(client2, n) for n in missing],
+    remaining = [n for n in names if n.lower() not in photo_map]
+
+    for attempt in range(4):
+        if not remaining:
+            break
+        timeout = 15 + attempt * 5
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            results = await asyncio.gather(
+                *[_limited(client, n) for n in remaining],
                 return_exceptions=True,
             )
-            for r in retry_results:
-                if isinstance(r, tuple) and r[1]:
-                    photo_map[r[0]] = r[1]
+        for r in results:
+            if isinstance(r, tuple) and r[1]:
+                photo_map[r[0]] = r[1]
+                _photo_cache[r[0]] = r[1]
+        remaining = [n for n in remaining if n.lower() not in photo_map]
+        if remaining and attempt < 3:
+            await asyncio.sleep(1)
 
     for obs in observations:
         sci = (obs.get("scientific_name") or "").lower()
