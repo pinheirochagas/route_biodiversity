@@ -247,32 +247,54 @@ async def get_geology_point(body: dict):
 
 
 @router.get("/birdsong")
-async def get_birdsong(name: str, settings: Settings = Depends(get_settings)):
+async def get_birdsong(
+    name: str,
+    country: str = "",
+    settings: Settings = Depends(get_settings),
+):
     if not name.strip():
         return {"url": "", "recordist": "", "country": ""}
+
+    base = f'sp:"{name}"'
+    cnt = f' cnt:"{country}"' if country.strip() else ""
+
+    queries = [
+        f'{base}{cnt} q:A type:song',
+        f'{base}{cnt} type:song',
+        f'{base}{cnt} q:A',
+        f'{base}{cnt}',
+        f'{base} q:A type:song',
+        f'{base} type:song',
+        f'{base} q:A',
+        f'{base}',
+    ]
+    if not cnt:
+        queries = queries[4:]
+
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                "https://xeno-canto.org/api/3/recordings",
-                params={
-                    "query": f'sp:"{name}" q:A type:song',
-                    "key": settings.xenocanto_api_key,
-                    "per_page": "1",
-                },
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                recs = data.get("recordings", [])
-                if recs:
-                    r = recs[0]
-                    file_url = r.get("file", "")
-                    if file_url.startswith("//"):
-                        file_url = "https:" + file_url
-                    return {
-                        "url": file_url,
-                        "recordist": r.get("rec", ""),
-                        "country": r.get("cnt", ""),
-                    }
+            for q in queries:
+                resp = await client.get(
+                    "https://xeno-canto.org/api/3/recordings",
+                    params={
+                        "query": q,
+                        "key": settings.xenocanto_api_key,
+                        "per_page": "1",
+                    },
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    recs = data.get("recordings", [])
+                    if recs:
+                        r = recs[0]
+                        file_url = r.get("file", "")
+                        if file_url.startswith("//"):
+                            file_url = "https:" + file_url
+                        return {
+                            "url": file_url,
+                            "recordist": r.get("rec", ""),
+                            "country": r.get("cnt", ""),
+                        }
     except Exception:
         pass
     return {"url": "", "recordist": "", "country": ""}

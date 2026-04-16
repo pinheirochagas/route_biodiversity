@@ -1629,7 +1629,8 @@
     btn.disabled = true;
 
     try {
-      const resp = await fetch(`/api/birdsong?name=${encodeURIComponent(sciName)}`);
+      const locParams = routeLocation.country ? `&country=${encodeURIComponent(routeLocation.country)}` : "";
+      const resp = await fetch(`/api/birdsong?name=${encodeURIComponent(sciName)}${locParams}`);
       const data = await resp.json();
 
       if (!data.url) {
