@@ -1,6 +1,7 @@
 import asyncio
 from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Depends
 import dateutil.parser
+import httpx
 
 from app.config import Settings, get_settings
 from app.services.strava import (
@@ -243,6 +244,38 @@ async def get_geology_point(body: dict):
         raise HTTPException(400, "lat and lng are required")
     formations = await fetch_geology_at_point(float(lat), float(lng))
     return {"formations": formations}
+
+
+@router.get("/birdsong")
+async def get_birdsong(name: str, settings: Settings = Depends(get_settings)):
+    if not name.strip():
+        return {"url": "", "recordist": "", "country": ""}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                "https://xeno-canto.org/api/3/recordings",
+                params={
+                    "query": f'sp:"{name}" q:A type:song',
+                    "key": settings.xenocanto_api_key,
+                    "per_page": "1",
+                },
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                recs = data.get("recordings", [])
+                if recs:
+                    r = recs[0]
+                    file_url = r.get("file", "")
+                    if file_url.startswith("//"):
+                        file_url = "https:" + file_url
+                    return {
+                        "url": file_url,
+                        "recordist": r.get("rec", ""),
+                        "country": r.get("cnt", ""),
+                    }
+    except Exception:
+        pass
+    return {"url": "", "recordist": "", "country": ""}
 
 
 @router.post("/gbif/species")

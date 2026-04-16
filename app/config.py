@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     ebird_api_key: str = ""
     mindat_api_key: str = ""
     google_api_key: str = ""
+    xenocanto_api_key: str = ""
 
     @property
     def strava_redirect_uri(self) -> str:

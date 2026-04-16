@@ -32,6 +32,8 @@
   let routePolyline = null;
   let situateBboxRect = null;
   let drawnItems = null;
+  let currentBirdsongAudio = null;
+  let currentBirdsongBtn = null;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -1553,6 +1555,10 @@
         : srcArr.includes("gbif") && !srcArr.includes("inat") ? "GBIF" : "iNaturalist";
       const linkTitle = `View on ${linkDomain}`;
 
+      const birdsongBtn = sp.taxa === "Aves"
+        ? `<button class="birdsong-btn" data-sciname="${sp.name}" title="Play bird song" onclick="event.stopPropagation()"><i class="fa-solid fa-volume-high"></i></button>`
+        : "";
+
       card.innerHTML = `
         ${sp.photo_url ? `<img class="species-card-img" src="${sp.photo_url}" alt="${sp.common_name || sp.name}" loading="lazy">` : '<div class="species-card-img"></div>'}
         <div class="species-card-body">
@@ -1561,12 +1567,23 @@
         </div>
         <div class="species-card-footer">
           <span class="obs-count">${sp.observations.toLocaleString()} obs${conservationBadge}${sourceBadge}</span>
-          <a href="${sp.url}" target="_blank" class="inat-link" title="${linkTitle}" onclick="event.stopPropagation()">
-            <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
-          </a>
+          <span class="footer-actions">
+            ${birdsongBtn}
+            <a href="${sp.url}" target="_blank" class="inat-link" title="${linkTitle}" onclick="event.stopPropagation()">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+            </a>
+          </span>
         </div>
         ${tooltip}
       `;
+
+      const songBtn = card.querySelector(".birdsong-btn");
+      if (songBtn) {
+        songBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          handleBirdsongClick(songBtn);
+        });
+      }
 
       card.addEventListener("click", () => {
         if (selectedCardEl) selectedCardEl.classList.remove("selected");
@@ -1588,6 +1605,96 @@
       });
 
       speciesContainer.appendChild(card);
+    }
+  }
+
+  async function handleBirdsongClick(btn) {
+    const sciName = btn.dataset.sciname;
+    const icon = btn.querySelector("i");
+
+    if (currentBirdsongAudio && currentBirdsongBtn === btn) {
+      if (currentBirdsongAudio.paused) {
+        currentBirdsongAudio.play();
+        icon.className = "fa-solid fa-pause";
+      } else {
+        currentBirdsongAudio.pause();
+        icon.className = "fa-solid fa-play";
+      }
+      return;
+    }
+
+    stopCurrentBirdsong();
+
+    icon.className = "fa-solid fa-spinner fa-spin";
+    btn.disabled = true;
+
+    try {
+      const resp = await fetch(`/api/birdsong?name=${encodeURIComponent(sciName)}`);
+      const data = await resp.json();
+
+      if (!data.url) {
+        icon.className = "fa-solid fa-volume-xmark";
+        btn.title = "No recording available";
+        btn.disabled = false;
+        setTimeout(() => {
+          icon.className = "fa-solid fa-volume-high";
+          btn.title = "Play bird song";
+        }, 2000);
+        return;
+      }
+
+      const audio = new Audio(data.url);
+      currentBirdsongAudio = audio;
+      currentBirdsongBtn = btn;
+
+      audio.addEventListener("canplay", () => {
+        btn.disabled = false;
+        icon.className = "fa-solid fa-pause";
+        if (data.recordist) {
+          btn.title = `Recording by ${data.recordist}`;
+        }
+        audio.play();
+      }, { once: true });
+
+      audio.addEventListener("ended", () => {
+        icon.className = "fa-solid fa-volume-high";
+        btn.title = "Play bird song";
+        currentBirdsongAudio = null;
+        currentBirdsongBtn = null;
+      });
+
+      audio.addEventListener("error", () => {
+        icon.className = "fa-solid fa-volume-xmark";
+        btn.disabled = false;
+        btn.title = "Playback error";
+        currentBirdsongAudio = null;
+        currentBirdsongBtn = null;
+        setTimeout(() => {
+          icon.className = "fa-solid fa-volume-high";
+          btn.title = "Play bird song";
+        }, 2000);
+      });
+
+      audio.load();
+    } catch (_) {
+      icon.className = "fa-solid fa-volume-high";
+      btn.disabled = false;
+      currentBirdsongAudio = null;
+      currentBirdsongBtn = null;
+    }
+  }
+
+  function stopCurrentBirdsong() {
+    if (currentBirdsongAudio) {
+      currentBirdsongAudio.pause();
+      currentBirdsongAudio.src = "";
+      currentBirdsongAudio = null;
+    }
+    if (currentBirdsongBtn) {
+      const icon = currentBirdsongBtn.querySelector("i");
+      if (icon) icon.className = "fa-solid fa-volume-high";
+      currentBirdsongBtn.title = "Play bird song";
+      currentBirdsongBtn = null;
     }
   }
 

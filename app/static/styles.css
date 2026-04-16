@@ -265,6 +265,34 @@ body {
   color: #6b7280;
   background: #f3f4f6;
 }
+.species-card .footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.birdsong-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: #3b82f6;
+  cursor: pointer;
+  font-size: 0.625rem;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.birdsong-btn:hover {
+  color: #2563eb;
+  background: #eff6ff;
+}
+.birdsong-btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
 
 /* Conservation badge */
 .conservation-badge {
