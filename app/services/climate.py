@@ -15,8 +15,7 @@ def _init_ee(service_account: str, key_file: str, project: str, key_json: str = 
         return
     try:
         if key_json:
-            key_data = json.loads(key_json)
-            credentials = ee.ServiceAccountCredentials(service_account, key_data=key_data)
+            credentials = ee.ServiceAccountCredentials(service_account, key_data=key_json)
         else:
             credentials = ee.ServiceAccountCredentials(service_account, key_file)
         ee.Initialize(credentials, project=project)
