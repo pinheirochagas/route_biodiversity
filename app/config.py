@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     xenocanto_api_key: str = ""
     gee_service_account: str = ""
     gee_key_file: str = ""
+    gee_key_json: str = ""
     gee_project: str = ""
 
     @property

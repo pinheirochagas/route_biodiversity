@@ -1,5 +1,7 @@
 import ee
+import json
 import logging
+import tempfile
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -7,12 +9,16 @@ logger = logging.getLogger(__name__)
 _ee_initialized = False
 
 
-def _init_ee(service_account: str, key_file: str, project: str):
+def _init_ee(service_account: str, key_file: str, project: str, key_json: str = ""):
     global _ee_initialized
     if _ee_initialized:
         return
     try:
-        credentials = ee.ServiceAccountCredentials(service_account, key_file)
+        if key_json:
+            key_data = json.loads(key_json)
+            credentials = ee.ServiceAccountCredentials(service_account, key_data=key_data)
+        else:
+            credentials = ee.ServiceAccountCredentials(service_account, key_file)
         ee.Initialize(credentials, project=project)
         _ee_initialized = True
         logger.info("Earth Engine initialized successfully")
@@ -32,6 +38,7 @@ async def fetch_temperature_history(
     service_account: str,
     key_file: str,
     project: str,
+    key_json: str = "",
     start_year: int = 1895,
     end_year: int = 2024,
 ) -> dict:
@@ -40,7 +47,7 @@ async def fetch_temperature_history(
     Uses PRISM (800m) for CONUS, ERA5-Land (11km) globally.
     Returns yearly values + anomalies relative to 1951-1980 baseline.
     """
-    _init_ee(service_account, key_file, project)
+    _init_ee(service_account, key_file, project, key_json=key_json)
 
     point = ee.Geometry.Point([lon, lat])
     use_prism = _is_in_conus(lat, lon)

@@ -263,6 +263,7 @@ async def get_climate(body: dict, settings: Settings = Depends(get_settings)):
         service_account=settings.gee_service_account,
         key_file=settings.gee_key_file,
         project=settings.gee_project,
+        key_json=settings.gee_key_json,
     )
     return data
 
