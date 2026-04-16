@@ -295,14 +295,12 @@ window.retryImg = function (img) {
   function closeMobileSidebar() {
     const sidebar = $("#sidebar");
     sidebar.classList.remove("mobile-expanded");
-    mobileFetchToggle.classList.remove("open");
     if (mobileBackdrop) { mobileBackdrop.remove(); mobileBackdrop = null; }
   }
 
   function openMobileSidebar() {
     const sidebar = $("#sidebar");
     sidebar.classList.add("mobile-expanded");
-    mobileFetchToggle.classList.add("open");
     if (!mobileBackdrop) {
       mobileBackdrop = document.createElement("div");
       mobileBackdrop.className = "mobile-sidebar-backdrop";
@@ -311,14 +309,37 @@ window.retryImg = function (img) {
     }
   }
 
+  function switchMobileMode(mode) {
+    $$(".mode-btn").forEach((b) => b.classList.remove("active"));
+    const targetBtn = $(`.mode-btn[data-mode="${mode}"]`);
+    if (targetBtn) targetBtn.classList.add("active");
+    $$(".mode-panel").forEach((p) => p.classList.add("hidden"));
+    const targetPanel = $(`#mode-${mode}`);
+    if (targetPanel) targetPanel.classList.remove("hidden");
+  }
+
   if (mobileFetchToggle) {
-    mobileFetchToggle.addEventListener("click", () => {
-      const sidebar = $("#sidebar");
-      if (sidebar.classList.contains("mobile-expanded")) {
-        closeMobileSidebar();
-      } else {
-        openMobileSidebar();
-      }
+    mobileFetchToggle.querySelectorAll(".mobile-nav-tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const mode = tab.dataset.open;
+        const wasActive = tab.classList.contains("active");
+        const routeLoaded = document.body.classList.contains("route-loaded");
+
+        mobileFetchToggle.querySelectorAll(".mobile-nav-tab").forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+        switchMobileMode(mode);
+
+        if (routeLoaded) {
+          const sidebar = $("#sidebar");
+          const isOpen = sidebar.classList.contains("mobile-expanded");
+          if (isOpen && wasActive) {
+            closeMobileSidebar();
+            tab.classList.add("active");
+          } else if (!isOpen) {
+            openMobileSidebar();
+          }
+        }
+      });
     });
   }
 
@@ -726,6 +747,16 @@ window.retryImg = function (img) {
 
     const infoBar = $("#route-info-bar");
     infoBar.classList.remove("hidden");
+    const climateSection = $("#climate-section");
+    if (climateSection) {
+      climateSection.classList.remove("hidden");
+      const cb = $("#climate-body");
+      const ch = $("#climate-header");
+      if (cb) cb.classList.add("collapsed");
+      if (ch) ch.classList.add("collapsed");
+    }
+    const geoBar = $("#geomaterials-bar");
+    if (geoBar) geoBar.classList.remove("hidden");
 
     filtersSection.classList.remove("hidden");
 
@@ -737,7 +768,7 @@ window.retryImg = function (img) {
     if (sep) sep.classList.add("hidden");
 
     const geologyInfoEl = $("#geology-info");
-    if (geologyInfoEl) geologyInfoEl.innerHTML = "";
+    if (geologyInfoEl) geologyInfoEl.innerHTML = '<div class="geo-section-title"><i class="fa-solid fa-mountain"></i> Geomaterials</div>';
     const geologyGalleryEl = $("#geology-gallery");
     if (geologyGalleryEl) { geologyGalleryEl.classList.add("hidden"); geologyGalleryEl.innerHTML = ""; }
     geologyGalleryOpen = false;
@@ -775,9 +806,6 @@ window.retryImg = function (img) {
     allEbirdObservations = [];
     geologyData = [];
     activeGeoClass = null;
-
-    const climateSection = $("#climate-section");
-    if (climateSection) climateSection.classList.add("hidden");
 
     for (const src of ["inat", "gbif", "ebird", "geology", "climate"]) {
       const toggle = $(`[data-source="${src}"]`);
@@ -1197,8 +1225,9 @@ window.retryImg = function (img) {
   function renderGeologyInfo(formations) {
     const el = $("#geology-info");
     if (!el) return;
+    const titleHtml = '<div class="geo-section-title"><i class="fa-solid fa-mountain"></i> Geomaterials</div>';
     if (!geologyEnabled || !formations || !formations.length) {
-      el.innerHTML = "";
+      el.innerHTML = titleHtml;
       return;
     }
 
@@ -1798,7 +1827,12 @@ window.retryImg = function (img) {
     const section = $("#climate-section");
     if (!section || !data || !data.years || data.years.length === 0) return;
 
-    section.classList.remove("hidden");
+    if (window.innerWidth > 768) {
+      const cb = $("#climate-body");
+      const ch = $("#climate-header");
+      if (cb) cb.classList.remove("collapsed");
+      if (ch) ch.classList.remove("collapsed");
+    }
 
     const anomalyEl = $("#climate-stat-anomaly .climate-stat-value");
     const rateEl = $("#climate-stat-rate .climate-stat-value");
@@ -1945,6 +1979,13 @@ window.retryImg = function (img) {
 
   function renderNdviSection(data) {
     if (!data || !data.years || data.years.length === 0) return;
+
+    if (window.innerWidth > 768) {
+      const cb = $("#climate-body");
+      const ch = $("#climate-header");
+      if (cb) cb.classList.remove("collapsed");
+      if (ch) ch.classList.remove("collapsed");
+    }
 
     const anomalyEl = $("#ndvi-stat-anomaly .climate-stat-value");
     const rateEl = $("#ndvi-stat-rate .climate-stat-value");
@@ -2302,6 +2343,10 @@ window.retryImg = function (img) {
         emptyState.classList.remove("hidden");
         const infoBar = $("#route-info-bar");
         if (infoBar) infoBar.classList.add("hidden");
+        const cs = $("#climate-section");
+        if (cs) cs.classList.add("hidden");
+        const geoBar = $("#geomaterials-bar");
+        if (geoBar) geoBar.classList.add("hidden");
         speciesContainer.innerHTML = "";
         document.body.classList.remove("route-loaded");
       } else {

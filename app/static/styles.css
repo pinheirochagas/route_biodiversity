@@ -493,8 +493,8 @@ body {
   display: none;
 }
 
-/* ── Mobile fetch-route toggle (hidden on desktop) ── */
-.mobile-fetch-toggle {
+/* ── Mobile nav bar (hidden on desktop) ── */
+.mobile-nav-bar {
   display: none;
 }
 
@@ -510,7 +510,8 @@ body {
   .app-shell {
     flex-direction: column;
     height: auto;
-    min-height: calc(100vh - 44px);
+    margin-top: 80px;
+    min-height: calc(100vh - 80px);
   }
 
   /* ── Sidebar: visible before route loaded, hidden after ── */
@@ -531,7 +532,7 @@ body {
   body.route-loaded .sidebar.mobile-expanded {
     display: flex;
     position: fixed;
-    top: 44px;
+    top: 80px;
     left: 0;
     right: 0;
     z-index: 45;
@@ -540,26 +541,14 @@ body {
     border-bottom: 1px solid #e5e7eb;
   }
 
-  /* ── Mobile sidebar close button (only in overlay mode) ── */
+  /* ── Mobile sidebar close button — hidden, nav tabs handle it ── */
   .mobile-sidebar-close {
-    display: none;
+    display: none !important;
   }
-  .sidebar.mobile-expanded .mobile-sidebar-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    padding: 0.5rem;
-    font-size: 0.75rem;
-    font-family: inherit;
-    font-weight: 500;
-    background: #f3f4f6;
-    border: none;
-    border-bottom: 1px solid #e5e7eb;
-    color: #374151;
-    cursor: pointer;
-  }
-  .sidebar.mobile-expanded .mobile-sidebar-close:hover { background: #e5e7eb; }
+
+  /* Hide sidebar internal mode tabs and descriptions on mobile (top nav bar replaces them) */
+  .mode-tabs-bar { display: none !important; }
+  .mode-desc { display: none !important; }
 
   /* Hide sidebar taxa and sources sections on mobile */
   #taxa-section { display: none !important; }
@@ -592,30 +581,44 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  /* ── Mobile "Fetch route" button in filters row ── */
-  .mobile-fetch-toggle {
+  /* ── Mobile nav bar (Activities / Situate) ── */
+  .mobile-nav-bar {
+    display: flex !important;
+    position: fixed;
+    top: 44px;
+    left: 0;
+    right: 0;
+    z-index: 45;
+    padding: 0.375rem 0.75rem;
+    background: #fff;
+    border-bottom: 1px solid #f3f4f6;
+    justify-content: center;
+  }
+  .mobile-nav-tabs {
     display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.5rem;
+    background: #f3f4f6;
+    border-radius: 0.375rem;
+    padding: 2px;
+    gap: 2px;
+  }
+  .mobile-nav-tab {
+    padding: 0.3rem 1.25rem;
     font-size: 0.6875rem;
     font-family: inherit;
     font-weight: 500;
     border: none;
-    border-radius: 0.375rem;
-    background: #111827;
-    color: #fff;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: #6b7280;
     cursor: pointer;
     white-space: nowrap;
-    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
   }
-  .mobile-fetch-toggle:hover { background: #374151; }
-  .mobile-fetch-arrow {
-    font-size: 0.5rem;
-    transition: transform 0.15s;
-  }
-  .mobile-fetch-toggle.open .mobile-fetch-arrow {
-    transform: rotate(180deg);
+  .mobile-nav-tab:hover { background: #e5e7eb; }
+  .mobile-nav-tab.active {
+    background: #fff;
+    color: #111827;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
   }
 
   /* ── Mobile taxa row (wrapping pills) ── */
@@ -658,7 +661,7 @@ body {
   .mobile-sidebar-backdrop {
     position: fixed;
     inset: 0;
-    top: 44px;
+    top: 80px;
     z-index: 44;
     background: rgba(0, 0, 0, 0.2);
   }

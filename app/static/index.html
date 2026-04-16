@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="/static/styles.css?v=9">
+  <link rel="stylesheet" href="/static/styles.css?v=17">
 </head>
 <body class="bg-white text-gray-900 antialiased">
 
@@ -41,17 +41,25 @@
     </div>
   </header>
 
+  <!-- Mobile nav bar (Activities / Situate) - fixed below header on mobile -->
+  <div id="mobile-fetch-toggle" class="mobile-nav-bar">
+    <div class="mobile-nav-tabs">
+          <button class="mobile-nav-tab active" data-open="activities" type="button">Activities</button>
+          <button class="mobile-nav-tab" data-open="situate" type="button">Situate</button>
+    </div>
+  </div>
+
   <!-- App Shell: 3 panels -->
   <div class="app-shell">
 
     <!-- PANEL 1: Sidebar -->
     <aside class="sidebar" id="sidebar">
-      <button id="mobile-sidebar-close" class="mobile-sidebar-close" type="button" onclick="document.getElementById('sidebar').classList.remove('mobile-expanded');document.querySelector('.mobile-fetch-toggle').classList.remove('open');var bd=document.querySelector('.mobile-sidebar-backdrop');if(bd)bd.remove();">&times; Close</button>
+      <button id="mobile-sidebar-close" class="mobile-sidebar-close" type="button">&times; Close</button>
       <div class="sidebar-scroll">
 
         <!-- Mode: Activities / Situate -->
         <div class="sidebar-section">
-          <div class="flex gap-1 mb-2 bg-gray-50 rounded-md p-0.5">
+          <div class="mode-tabs-bar flex gap-1 mb-2 bg-gray-50 rounded-md p-0.5">
             <button data-mode="activities" class="mode-btn active flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
               Activities
             </button>
@@ -61,7 +69,7 @@
           </div>
 
           <div id="mode-activities" class="mode-panel">
-            <p class="text-[9px] text-gray-400 mb-2" style="line-height:1.4">Explore the bio and geological diversity along your routes.</p>
+            <p class="mode-desc text-[9px] text-gray-400 mb-2" style="line-height:1.4">Explore the bio and geological diversity along your routes.</p>
             <div class="flex gap-1 mb-2 bg-gray-50 rounded-md p-0.5">
               <button data-tab="strava" class="tab-btn active flex-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors">
                 Strava
@@ -105,7 +113,7 @@
           </div>
 
           <div id="mode-situate" class="mode-panel hidden">
-            <p class="text-[9px] text-gray-400 mb-2" style="line-height:1.4">Contextualize yourself in nature.</p>
+            <p class="mode-desc text-[9px] text-gray-400 mb-2" style="line-height:1.4">Contextualize yourself in nature.</p>
             <button id="btn-situate"
                     class="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 transition-colors disabled:opacity-40">
               <i class="fa-solid fa-location-crosshairs"></i> Use my location
@@ -202,12 +210,10 @@
             <span id="route-country"></span>
           </div>
           <div id="territories" class="mt-1"></div>
-          <div id="geology-info" class="mt-1" style="cursor:pointer"></div>
-          <div id="geology-gallery" class="geology-gallery hidden"></div>
         </div>
       </div>
 
-      <!-- Climate Section -->
+      <!-- Environment Section -->
       <div id="climate-section" class="climate-section hidden">
         <button class="climate-header" id="climate-header" type="button">
           <span class="climate-header-title"><i class="fa-solid fa-earth-americas"></i> Environment</span>
@@ -248,10 +254,10 @@
                 <span class="climate-stat-value">--</span>
                 <span class="climate-stat-label">per decade</span>
               </div>
-          <div class="climate-stat" id="ndvi-stat-dataset">
-            <span class="climate-stat-value">--</span>
-            <span class="climate-stat-label">250m trend</span>
-          </div>
+              <div class="climate-stat" id="ndvi-stat-dataset">
+                <span class="climate-stat-value">--</span>
+                <span class="climate-stat-label">250m trend</span>
+              </div>
             </div>
             <canvas id="ndvi-stripes" width="800" height="100"></canvas>
             <div class="climate-axis">
@@ -263,12 +269,19 @@
         </div>
       </div>
 
+      <!-- Geomaterials Section -->
+      <div id="geomaterials-bar" class="route-info-bar hidden" style="border-top:none;padding-top:0">
+        <div>
+          <div id="geology-info" style="cursor:pointer">
+            <div class="geo-section-title"><i class="fa-solid fa-mountain"></i> Geomaterials</div>
+          </div>
+          <div id="geology-gallery" class="geology-gallery hidden"></div>
+        </div>
+      </div>
+
       <!-- Filters bar -->
       <div id="filters-section" class="filters-bar hidden">
         <div class="filters-row">
-          <button id="mobile-fetch-toggle" class="mobile-fetch-toggle" type="button">
-            Fetch route <span class="mobile-fetch-arrow">&#9662;</span>
-          </button>
           <select id="month-select" class="filter-select">
             <option value="0">Year-round</option>
             <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
@@ -332,6 +345,6 @@
 
   </div>
 
-  <script src="/static/app.js?v=9"></script>
+  <script src="/static/app.js?v=17"></script>
 </body>
 </html>
