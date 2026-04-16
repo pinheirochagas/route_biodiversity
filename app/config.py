@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     mindat_api_key: str = ""
     google_api_key: str = ""
     xenocanto_api_key: str = ""
+    gee_service_account: str = ""
+    gee_key_file: str = ""
+    gee_project: str = ""
 
     @property
     def strava_redirect_uri(self) -> str:

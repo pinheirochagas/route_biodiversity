@@ -31,6 +31,7 @@ from app.services.biodiversity import (
 )
 from app.services.ebird import fetch_recent_observations, fetch_notable_observations, enrich_with_photos
 from app.services.geology import fetch_geology_along_route, fetch_geology_at_point
+from app.services.climate import fetch_temperature_history
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -244,6 +245,26 @@ async def get_geology_point(body: dict):
         raise HTTPException(400, "lat and lng are required")
     formations = await fetch_geology_at_point(float(lat), float(lng))
     return {"formations": formations}
+
+
+@router.post("/climate")
+async def get_climate(body: dict, settings: Settings = Depends(get_settings)):
+    bbox = body.get("bbox")
+    if not bbox or len(bbox) != 4:
+        raise HTTPException(400, "bbox must be [swlat, swlng, nelat, nelng]")
+    if not settings.gee_service_account or not settings.gee_key_file:
+        return {"error": "Google Earth Engine not configured"}
+
+    lat = (bbox[0] + bbox[2]) / 2
+    lon = (bbox[1] + bbox[3]) / 2
+
+    data = await fetch_temperature_history(
+        lat, lon,
+        service_account=settings.gee_service_account,
+        key_file=settings.gee_key_file,
+        project=settings.gee_project,
+    )
+    return data
 
 
 @router.get("/birdsong")

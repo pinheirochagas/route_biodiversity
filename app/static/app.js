@@ -34,6 +34,8 @@
   let drawnItems = null;
   let currentBirdsongAudio = null;
   let currentBirdsongBtn = null;
+  let climateEnabled = true;
+  let climateData = null;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -413,6 +415,13 @@
           toggleGeologyLayer();
           renderGeologyInfo(geologyData);
           return;
+        } else if (source === "climate") {
+          climateEnabled = !climateEnabled;
+          el.classList.toggle("active", climateEnabled);
+          el.classList.toggle("off", !climateEnabled);
+          const climateSection = $("#climate-section");
+          if (climateSection) climateSection.classList.toggle("hidden", !climateEnabled);
+          return;
         }
         const merged = getMergedSpeciesData();
         renderTaxaFilters(merged);
@@ -740,13 +749,18 @@
     gbifEnabled = true;
     ebirdEnabled = true;
     geologyEnabled = true;
+    climateEnabled = true;
+    climateData = null;
     gbifSpeciesData = {};
     ebirdSpeciesData = {};
     allEbirdObservations = [];
     geologyData = [];
     activeGeoClass = null;
 
-    for (const src of ["inat", "gbif", "ebird", "geology"]) {
+    const climateSection = $("#climate-section");
+    if (climateSection) climateSection.classList.add("hidden");
+
+    for (const src of ["inat", "gbif", "ebird", "geology", "climate"]) {
       const toggle = $(`[data-source="${src}"]`);
       if (toggle) { toggle.classList.add("active"); toggle.classList.remove("off"); }
     }
@@ -763,6 +777,7 @@
     renderMap(routeData.coords, routeData.bbox);
     const locationReady = fetchTerritories(routeData.bbox);
     loadAllSpecies(locationReady);
+    if (climateEnabled) fetchClimateData(routeData.bbox);
   }
 
   function renderMobileSources() {
@@ -776,6 +791,7 @@
       { key: "gbif", label: "GBIF", icon: "fa-database", color: "#8b5cf6" },
       { key: "ebird", label: "eBird", icon: "fa-dove", color: "#3b82f6" },
       { key: "geology", label: "Geology", icon: "fa-mountain", color: "#a3724e" },
+      { key: "climate", label: "Climate", icon: "fa-temperature-arrow-up", color: "#ef4444" },
     ];
     for (const s of sources) {
       const pill = document.createElement("span");
@@ -795,6 +811,11 @@
           pill.classList.toggle("active", geologyEnabled);
           toggleGeologyLayer();
           renderGeologyInfo(geologyData);
+        } else if (s.key === "climate") {
+          climateEnabled = !climateEnabled;
+          pill.classList.toggle("active", climateEnabled);
+          const cs = $("#climate-section");
+          if (cs) cs.classList.toggle("hidden", !climateEnabled);
         }
         const dtoggle = $(`[data-source="${s.key}"]`);
         if (dtoggle) { dtoggle.classList.toggle("active"); dtoggle.classList.toggle("off"); }
@@ -1696,6 +1717,123 @@
       if (icon) icon.className = "fa-solid fa-volume-high";
       currentBirdsongBtn.title = "Play bird song";
       currentBirdsongBtn = null;
+    }
+  }
+
+  // ── Climate data ──
+  async function fetchClimateData(bbox) {
+    const countEl = $("#climate-count");
+    if (countEl) countEl.textContent = "…";
+
+    try {
+      const resp = await fetch("/api/climate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bbox }),
+      });
+      const data = await resp.json();
+
+      if (data.error) {
+        if (countEl) countEl.textContent = "err";
+        return;
+      }
+
+      climateData = data;
+      if (countEl) countEl.textContent = data.years ? data.years.length + "yr" : "";
+
+      if (climateEnabled) {
+        renderClimateSection(data);
+      }
+    } catch (_) {
+      if (countEl) countEl.textContent = "err";
+    }
+  }
+
+  function renderClimateSection(data) {
+    const section = $("#climate-section");
+    if (!section || !data || !data.years || data.years.length === 0) return;
+
+    section.classList.remove("hidden");
+
+    const anomalyEl = $("#climate-stat-anomaly .climate-stat-value");
+    const rateEl = $("#climate-stat-rate .climate-stat-value");
+    const datasetEl = $("#climate-stat-dataset .climate-stat-value");
+
+    if (anomalyEl && data.current_anomaly != null) {
+      const sign = data.current_anomaly >= 0 ? "+" : "";
+      anomalyEl.textContent = `${sign}${data.current_anomaly.toFixed(2)}°C`;
+      anomalyEl.style.color = data.current_anomaly >= 0 ? "#ef4444" : "#3b82f6";
+    }
+    if (rateEl && data.warming_rate != null) {
+      const sign = data.warming_rate >= 0 ? "+" : "";
+      rateEl.textContent = `${sign}${data.warming_rate.toFixed(2)}°C`;
+      rateEl.style.color = data.warming_rate >= 0 ? "#ef4444" : "#3b82f6";
+    }
+    if (datasetEl) {
+      datasetEl.textContent = data.dataset || "—";
+    }
+
+    const startEl = $("#climate-year-start");
+    const endEl = $("#climate-year-end");
+    if (startEl) startEl.textContent = data.years[0].year;
+    if (endEl) endEl.textContent = data.years[data.years.length - 1].year;
+
+    renderWarmingStripes(data.years);
+  }
+
+  function renderWarmingStripes(years) {
+    const canvas = $("#warming-stripes");
+    if (!canvas || !years.length) return;
+
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const displayW = canvas.clientWidth || 800;
+    const displayH = canvas.clientHeight || 100;
+    canvas.width = displayW * dpr;
+    canvas.height = displayH * dpr;
+    ctx.scale(dpr, dpr);
+
+    const anomalies = years.map((y) => y.anomaly).filter((a) => a != null);
+    const maxAbs = Math.max(Math.abs(Math.min(...anomalies)), Math.abs(Math.max(...anomalies)), 0.5);
+
+    const stripeW = displayW / years.length;
+
+    for (let i = 0; i < years.length; i++) {
+      const a = years[i].anomaly;
+      if (a == null) { ctx.fillStyle = "#e5e7eb"; }
+      else {
+        const t = Math.max(-1, Math.min(1, a / maxAbs));
+        ctx.fillStyle = anomalyColor(t);
+      }
+      ctx.fillRect(i * stripeW, 0, stripeW + 0.5, displayH);
+    }
+
+    canvas.title = `Temperature anomaly: ${years[0].year}–${years[years.length - 1].year}`;
+
+    canvas.onmousemove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const idx = Math.floor((x / rect.width) * years.length);
+      if (idx >= 0 && idx < years.length) {
+        const y = years[idx];
+        const sign = y.anomaly >= 0 ? "+" : "";
+        canvas.title = `${y.year}: ${y.temp}°C (${sign}${y.anomaly}°C)`;
+      }
+    };
+  }
+
+  function anomalyColor(t) {
+    if (t >= 0) {
+      const r = Math.round(255);
+      const g = Math.round(255 * (1 - t * 0.85));
+      const b = Math.round(255 * (1 - t * 0.95));
+      return `rgb(${r},${g},${b})`;
+    } else {
+      const abs = Math.abs(t);
+      const r = Math.round(255 * (1 - abs * 0.95));
+      const g = Math.round(255 * (1 - abs * 0.6));
+      const b = Math.round(255);
+      return `rgb(${r},${g},${b})`;
     }
   }
 

@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="/static/styles.css?v=4">
+  <link rel="stylesheet" href="/static/styles.css?v=5">
 </head>
 <body class="bg-white text-gray-900 antialiased">
 
@@ -168,6 +168,11 @@
               <span class="taxa-toggle-label">Geomaterials</span>
               <span class="taxa-toggle-count" id="geology-count"></span>
             </div>
+            <div class="taxa-toggle active" data-source="climate">
+              <span class="taxa-toggle-icon" style="color:#ef4444"><i class="fa-solid fa-temperature-arrow-up"></i></span>
+              <span class="taxa-toggle-label">Climate</span>
+              <span class="taxa-toggle-count" id="climate-count"></span>
+            </div>
           </div>
           <div id="bbox-expand-row" class="flex items-center gap-1.5 mt-1.5">
             <span class="text-[9px] text-gray-400 flex-shrink-0">Search area:</span>
@@ -209,6 +214,30 @@
           <div id="territories" class="mt-1"></div>
           <div id="geology-info" class="mt-1" style="cursor:pointer"></div>
           <div id="geology-gallery" class="geology-gallery hidden"></div>
+        </div>
+      </div>
+
+      <!-- Climate Section -->
+      <div id="climate-section" class="climate-section hidden">
+        <div class="climate-summary">
+          <div class="climate-stat" id="climate-stat-anomaly">
+            <span class="climate-stat-value">--</span>
+            <span class="climate-stat-label">vs 1951–1980</span>
+          </div>
+          <div class="climate-stat" id="climate-stat-rate">
+            <span class="climate-stat-value">--</span>
+            <span class="climate-stat-label">per decade</span>
+          </div>
+          <div class="climate-stat" id="climate-stat-dataset">
+            <span class="climate-stat-value">--</span>
+            <span class="climate-stat-label">dataset</span>
+          </div>
+        </div>
+        <canvas id="warming-stripes" width="800" height="100"></canvas>
+        <div class="climate-axis">
+          <span id="climate-year-start"></span>
+          <span class="climate-axis-title">Temperature Anomaly</span>
+          <span id="climate-year-end"></span>
         </div>
       </div>
 
@@ -281,6 +310,6 @@
 
   </div>
 
-  <script src="/static/app.js?v=4"></script>
+  <script src="/static/app.js?v=5"></script>
 </body>
 </html>

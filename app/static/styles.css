@@ -1005,6 +1005,58 @@ ul#situate-suggestions li b {
   color: #111827;
 }
 
+/* ── Climate Section ── */
+.climate-section {
+  padding: 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+.climate-summary {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.625rem;
+}
+.climate-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+.climate-stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #111827;
+}
+.climate-stat-label {
+  font-size: 0.5625rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 0.125rem;
+}
+#warming-stripes {
+  width: 100%;
+  height: 60px;
+  border-radius: 0.25rem;
+  cursor: crosshair;
+  display: block;
+}
+.climate-axis {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.5625rem;
+  color: #9ca3af;
+  margin-top: 0.25rem;
+  padding: 0 0.125rem;
+}
+.climate-axis-title {
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* ── Scrollbar ── */
 .sidebar-scroll::-webkit-scrollbar,
 .panel-center::-webkit-scrollbar {

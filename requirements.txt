@@ -7,3 +7,4 @@ python-dateutil>=2.9
 gpxpy>=1.6
 itsdangerous>=2.2
 starlette>=0.45
+earthengine-api>=1.7

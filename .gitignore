@@ -146,6 +146,9 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# GCP service account keys
+gen-lang-client-*.json
+
 # Pyre type checker
 .pyre/
 
