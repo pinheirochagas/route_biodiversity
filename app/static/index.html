@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="/static/styles.css?v=17">
+  <link rel="stylesheet" href="/static/styles.css?v=22">
 </head>
 <body class="bg-white text-gray-900 antialiased">
 
@@ -26,6 +26,38 @@
         <h1 class="text-sm font-semibold tracking-tight">Route to Biodiversity</h1>
       </div>
       <div id="auth-area" class="flex items-center gap-2">
+        <div class="about-wrapper">
+          <button id="about-toggle" class="about-toggle" type="button">About</button>
+          <div id="about-dropdown" class="about-dropdown hidden">
+            <p><strong>Route to Biodiversity</strong> situates humans in the living landscape, exploring the biological, geological, and environmental character of any route or location on the planet.</p>
+            <p>Connect your <a href="https://www.strava.com" target="_blank">Strava</a> activities, upload a GPX file, or use <em>Situate</em> to find your location or search anywhere. The app aggregates data from multiple sources to show the species observed along your path, the rock formations and minerals beneath it, and long-term trends in temperature, vegetation, and wildfire activity. In the US, it also surfaces the indigenous peoples whose territories the route crosses.</p>
+            <p class="about-sources-label">Biodiversity</p>
+            <p class="about-sources">
+              <a href="https://www.inaturalist.org" target="_blank">iNaturalist</a>, community species observations<br>
+              <a href="https://www.gbif.org" target="_blank">GBIF</a>, global biodiversity records<br>
+              <a href="https://ebird.org" target="_blank">eBird</a>, bird sightings and hotspots<br>
+              <a href="https://www.xeno-canto.org" target="_blank">Xeno-Canto</a>, bird sound recordings
+            </p>
+            <p class="about-sources-label">Geomaterials</p>
+            <p class="about-sources">
+              <a href="https://macrostrat.org" target="_blank">Macrostrat</a>, rock formations and lithology<br>
+              <a href="https://www.mindat.org" target="_blank">Mindat</a>, minerals and localities<br>
+              <a href="https://en.wikipedia.org" target="_blank">Wikipedia</a>, geological descriptions
+            </p>
+            <p class="about-sources-label">Environment</p>
+            <p class="about-sources">
+              <a href="https://earthengine.google.com" target="_blank">Google Earth Engine</a>, satellite imagery and analysis<br>
+              MODIS, PRISM, ERA5-Land, temperature anomalies, vegetation health (NDVI), and fire history
+            </p>
+            <p class="about-sources-label">Territories</p>
+            <p class="about-sources">
+              <a href="https://native-land.ca" target="_blank">Native Land Digital</a>, indigenous territories, languages, and treaties (currently US-focused)
+            </p>
+            <p class="about-gh">
+              <a href="https://github.com/pinheirochagas/route_biodiversity" target="_blank"><i class="fa-brands fa-github"></i> Source on GitHub</a>
+            </p>
+          </div>
+        </div>
         <a href="/auth/strava" id="btn-connect"
            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 transition-colors">
           Connect Strava
@@ -190,7 +222,12 @@
             <a href="https://www.inaturalist.org" target="_blank" class="underline">iNaturalist</a> &middot;
             <a href="https://www.gbif.org" target="_blank" class="underline">GBIF</a> &middot;
             <a href="https://ebird.org" target="_blank" class="underline">eBird</a> &middot;
+            <a href="https://www.xeno-canto.org" target="_blank" class="underline">Xeno-Canto</a> &middot;
             <a href="https://native-land.ca" target="_blank" class="underline">Native Land</a> &middot;
+            <a href="https://macrostrat.org" target="_blank" class="underline">Macrostrat</a> &middot;
+            <a href="https://www.mindat.org" target="_blank" class="underline">Mindat</a> &middot;
+            <a href="https://earthengine.google.com" target="_blank" class="underline">Google Earth Engine</a> &middot;
+            <a href="https://www.strava.com" target="_blank" class="underline">Strava</a> &middot;
             <a href="https://github.com/pinheirochagas/route_biodiversity" target="_blank" class="underline">GitHub</a>
           </p>
         </div>
@@ -345,6 +382,6 @@
 
   </div>
 
-  <script src="/static/app.js?v=17"></script>
+  <script src="/static/app.js?v=22"></script>
 </body>
 </html>

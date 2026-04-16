@@ -27,6 +27,81 @@ body {
   justify-content: space-between;
 }
 
+/* ── About dropdown ── */
+.about-wrapper {
+  position: relative;
+}
+.about-toggle {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  padding: 0.3rem 0.625rem;
+  transition: background 0.15s, color 0.15s;
+}
+.about-toggle:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+.about-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 0.875rem 1rem;
+  z-index: 200;
+}
+.about-dropdown p {
+  font-size: 10px;
+  line-height: 1.55;
+  color: #6b7280;
+  margin: 0 0 0.5rem 0;
+}
+.about-dropdown p:last-child {
+  margin-bottom: 0;
+}
+.about-sources-label {
+  font-weight: 600;
+  color: #374151 !important;
+  font-size: 9px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.2rem !important;
+}
+.about-sources {
+  font-size: 9px !important;
+  line-height: 1.6 !important;
+}
+.about-sources a, .about-gh a {
+  color: #6b7280;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+.about-sources a:hover, .about-gh a:hover {
+  color: #111827;
+}
+.about-gh {
+  margin-top: 0.5rem !important;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f3f4f6;
+}
+.about-gh a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
 /* ── App Shell: 3-panel ── */
 .app-shell {
   display: flex;
@@ -507,6 +582,25 @@ body {
   body {
     overflow: auto;
   }
+
+  /* ── About dropdown: full-width sheet on mobile ── */
+  .about-wrapper {
+    position: static;
+  }
+  .about-dropdown {
+    position: fixed;
+    top: 44px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    max-height: calc(100vh - 44px);
+    overflow-y: auto;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+  }
+
   .app-shell {
     flex-direction: column;
     height: auto;
@@ -566,7 +660,7 @@ body {
     order: 2;
     width: 100%;
     min-width: 0;
-    height: 35vh;
+    height: 50vh;
     flex-shrink: 0;
     border-left: none;
   }
@@ -981,6 +1075,37 @@ body {
 .map-layer-row span {
   font-size: 10px;
   line-height: 1;
+}
+
+/* ── Map fullscreen toggle ── */
+.map-fullscreen-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: none;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  cursor: pointer;
+  color: #374151;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+.map-fullscreen-btn:hover {
+  background: #f3f4f6;
+}
+.panel-map.map-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 9999;
+  border: none !important;
 }
 
 /* ── Location search suggestions ── */

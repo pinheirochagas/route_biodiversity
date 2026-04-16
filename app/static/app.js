@@ -93,6 +93,21 @@ window.retryImg = function (img) {
   const bboxExpandSelect = $("#bbox-expand");
   let geoOverlayCb = null;
 
+  // ── About dropdown ──
+  const aboutToggle = $("#about-toggle");
+  const aboutDropdown = $("#about-dropdown");
+  if (aboutToggle && aboutDropdown) {
+    aboutToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      aboutDropdown.classList.toggle("hidden");
+    });
+    document.addEventListener("click", (e) => {
+      if (!aboutDropdown.classList.contains("hidden") && !aboutDropdown.contains(e.target)) {
+        aboutDropdown.classList.add("hidden");
+      }
+    });
+  }
+
   // ── Taxa Font Awesome icon classes ──
   const TAXA_ICON_CLASSES = {
     Mammalia: "fa-solid fa-paw",
@@ -2289,6 +2304,27 @@ window.retryImg = function (img) {
       },
     });
     leafletMap.addControl(new LayerLegend());
+
+    const FullscreenControl = L.Control.extend({
+      options: { position: "topright" },
+      onAdd: function () {
+        const btn = L.DomUtil.create("div", "map-fullscreen-btn");
+        btn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+        btn.title = "Toggle fullscreen map";
+        L.DomEvent.disableClickPropagation(btn);
+        btn.addEventListener("click", () => {
+          const panel = $("#panel-map");
+          const isFs = panel.classList.toggle("map-fullscreen");
+          btn.innerHTML = isFs
+            ? '<i class="fa-solid fa-compress"></i>'
+            : '<i class="fa-solid fa-expand"></i>';
+          btn.title = isFs ? "Exit fullscreen" : "Toggle fullscreen map";
+          setTimeout(() => leafletMap.invalidateSize(), 200);
+        });
+        return btn;
+      },
+    });
+    leafletMap.addControl(new FullscreenControl());
 
     leafletMap.on("click", handleGeologyMapClick);
 
