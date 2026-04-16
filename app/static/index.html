@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="/static/styles.css?v=7">
+  <link rel="stylesheet" href="/static/styles.css?v=9">
 </head>
 <body class="bg-white text-gray-900 antialiased">
 
@@ -140,7 +140,7 @@
 
         <!-- Data Sources (shown after load) -->
         <div id="sources-section" class="sidebar-section hidden">
-          <div class="sidebar-label">Data Sources</div>
+          <div class="sidebar-label">Biodiversity Data Sources</div>
           <div id="source-toggles" class="space-y-0.5">
             <div class="taxa-toggle active" data-source="inat">
               <span class="taxa-toggle-icon" style="color:#74ac00"><i class="fa-solid fa-binoculars"></i></span>
@@ -162,16 +162,6 @@
                 <option value="30" selected>30d</option>
                 <option value="all">All time</option>
               </select>
-            </div>
-            <div class="taxa-toggle active" data-source="geology">
-              <span class="taxa-toggle-icon" style="color:#a3724e"><i class="fa-solid fa-mountain"></i></span>
-              <span class="taxa-toggle-label">Geomaterials</span>
-              <span class="taxa-toggle-count" id="geology-count"></span>
-            </div>
-            <div class="taxa-toggle active" data-source="climate">
-              <span class="taxa-toggle-icon" style="color:#ef4444"><i class="fa-solid fa-earth-americas"></i></span>
-              <span class="taxa-toggle-label">Environment</span>
-              <span class="taxa-toggle-count" id="climate-count"></span>
             </div>
           </div>
           <div id="bbox-expand-row" class="flex items-center gap-1.5 mt-1.5">
@@ -342,6 +332,6 @@
 
   </div>
 
-  <script src="/static/app.js?v=7"></script>
+  <script src="/static/app.js?v=9"></script>
 </body>
 </html>

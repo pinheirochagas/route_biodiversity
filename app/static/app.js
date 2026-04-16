@@ -53,6 +53,7 @@ window.retryImg = function (img) {
   let ndviData = null;
   let ndviTileLayer = null;
   let tempTileLayer = null;
+  let fireTileLayer = null;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -425,20 +426,6 @@ window.retryImg = function (img) {
           } else if (ebirdClusterGroup && leafletMap) {
             leafletMap.removeLayer(ebirdClusterGroup);
           }
-        } else if (source === "geology") {
-          geologyEnabled = !geologyEnabled;
-          el.classList.toggle("active", geologyEnabled);
-          el.classList.toggle("off", !geologyEnabled);
-          toggleGeologyLayer();
-          renderGeologyInfo(geologyData);
-          return;
-        } else if (source === "climate") {
-          climateEnabled = !climateEnabled;
-          el.classList.toggle("active", climateEnabled);
-          el.classList.toggle("off", !climateEnabled);
-          const climateSection = $("#climate-section");
-          if (climateSection) climateSection.classList.toggle("hidden", !climateEnabled);
-          return;
         }
         const merged = getMergedSpeciesData();
         renderTaxaFilters(merged);
@@ -782,6 +769,7 @@ window.retryImg = function (img) {
     ndviData = null;
     if (ndviTileLayer && leafletMap) { leafletMap.removeLayer(ndviTileLayer); ndviTileLayer = null; }
     if (tempTileLayer && leafletMap) { leafletMap.removeLayer(tempTileLayer); tempTileLayer = null; }
+    if (fireTileLayer && leafletMap) { leafletMap.removeLayer(fireTileLayer); fireTileLayer = null; }
     gbifSpeciesData = {};
     ebirdSpeciesData = {};
     allEbirdObservations = [];
@@ -824,8 +812,6 @@ window.retryImg = function (img) {
       { key: "inat", label: "iNat", icon: "fa-binoculars", color: "#74ac00" },
       { key: "gbif", label: "GBIF", icon: "fa-database", color: "#8b5cf6" },
       { key: "ebird", label: "eBird", icon: "fa-dove", color: "#3b82f6" },
-      { key: "geology", label: "Geology", icon: "fa-mountain", color: "#a3724e" },
-      { key: "climate", label: "Environment", icon: "fa-earth-americas", color: "#ef4444" },
     ];
     for (const s of sources) {
       const pill = document.createElement("span");
@@ -840,24 +826,12 @@ window.retryImg = function (img) {
           pill.classList.toggle("active", ebirdEnabled);
           if (ebirdEnabled) renderEbirdMarkers(allEbirdObservations);
           else if (ebirdClusterGroup && leafletMap) leafletMap.removeLayer(ebirdClusterGroup);
-        } else if (s.key === "geology") {
-          geologyEnabled = !geologyEnabled;
-          pill.classList.toggle("active", geologyEnabled);
-          toggleGeologyLayer();
-          renderGeologyInfo(geologyData);
-        } else if (s.key === "climate") {
-          climateEnabled = !climateEnabled;
-          pill.classList.toggle("active", climateEnabled);
-          const cs = $("#climate-section");
-          if (cs) cs.classList.toggle("hidden", !climateEnabled);
         }
         const dtoggle = $(`[data-source="${s.key}"]`);
         if (dtoggle) { dtoggle.classList.toggle("active"); dtoggle.classList.toggle("off"); }
-        if (s.key !== "geology") {
-          const merged = getMergedSpeciesData();
-          renderTaxaFilters(merged);
-          renderSpeciesCards();
-        }
+        const merged = getMergedSpeciesData();
+        renderTaxaFilters(merged);
+        renderSpeciesCards();
       });
       row.appendChild(pill);
     }
@@ -1234,8 +1208,9 @@ window.retryImg = function (img) {
       if (groups[cls]) totalCount += groups[cls].size;
     }
 
-    let html = '<div class="geo-class-filters">';
-    html += `<span class="geo-class-pill" data-cls="__all__"><i class="fa-solid fa-mountain"></i> Geomaterials <span class="geo-pill-count">${totalCount}</span></span>`;
+    let html = '<div class="geo-section-title"><i class="fa-solid fa-mountain"></i> Geomaterials</div>';
+    html += '<div class="geo-class-filters">';
+    html += `<span class="geo-class-pill" data-cls="__all__"><i class="fa-solid fa-mountain"></i> All <span class="geo-pill-count">${totalCount}</span></span>`;
 
     for (const cls of GEO_CLASS_ORDER) {
       if (!groups[cls] || groups[cls].size === 0) continue;
@@ -2052,6 +2027,27 @@ window.retryImg = function (img) {
     }
   }
 
+  // ── Fire trend tiles ──
+  async function fetchFireTiles() {
+    try {
+      const resp = await fetch("/api/climate/fire-tiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await resp.json();
+      if (data.tile_url && leafletMap) {
+        fireTileLayer = L.tileLayer(data.tile_url, {
+          opacity: 0.45,
+          maxZoom: 18,
+          attribution: "MODIS MCD64A1 500m &copy; NASA/Google Earth Engine",
+        });
+        const fireCb = document.querySelector('.map-layer-row input[data-layer="fire"]');
+        if (fireCb && fireCb.checked) fireTileLayer.addTo(leafletMap);
+      }
+    } catch (_) {}
+  }
+
   // ── Focus eBird species on map ──
   function focusEbirdSpeciesOnMap(scientificName) {
     if (!leafletMap || !allEbirdObservations.length) return;
@@ -2203,6 +2199,7 @@ window.retryImg = function (img) {
           { id: "geology", label: "Geology", icon: "fa-mountain", color: "#a3724e", checked: false },
           { id: "temp", label: "Temp. trend", icon: "fa-temperature-half", color: "#ef4444", checked: false },
           { id: "ndvi", label: "Veg. trend", icon: "fa-leaf", color: "#16a34a", checked: false },
+          { id: "fire", label: "Fire trend", icon: "fa-fire", color: "#f97316", checked: false },
         ];
 
         for (const lyr of layers) {
@@ -2233,6 +2230,16 @@ window.retryImg = function (img) {
                 else tempTileLayer.addTo(leafletMap);
               } else if (tempTileLayer) {
                 leafletMap.removeLayer(tempTileLayer);
+              }
+            });
+          } else if (lyr.id === "fire") {
+            cb.addEventListener("change", () => {
+              if (!leafletMap) return;
+              if (cb.checked) {
+                if (!fireTileLayer) fetchFireTiles();
+                else fireTileLayer.addTo(leafletMap);
+              } else if (fireTileLayer) {
+                leafletMap.removeLayer(fireTileLayer);
               }
             });
           }

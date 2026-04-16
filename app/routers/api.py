@@ -33,7 +33,7 @@ from app.services.ebird import fetch_recent_observations, fetch_notable_observat
 from app.services.geology import fetch_geology_along_route, fetch_geology_at_point
 from app.services.climate import (
     fetch_temperature_history, fetch_ndvi_history,
-    get_ndvi_trend_tile_url, get_temperature_trend_tile_url,
+    get_ndvi_trend_tile_url, get_temperature_trend_tile_url, get_fire_trend_tile_url,
 )
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -309,6 +309,20 @@ async def get_temp_tiles(body: dict, settings: Settings = Depends(get_settings))
         return {"error": "Google Earth Engine not configured"}
 
     data = get_temperature_trend_tile_url(
+        service_account=settings.gee_service_account,
+        key_file=settings.gee_key_file,
+        project=settings.gee_project,
+        key_json=settings.gee_key_json,
+    )
+    return data
+
+
+@router.post("/climate/fire-tiles")
+async def get_fire_tiles(body: dict, settings: Settings = Depends(get_settings)):
+    if not settings.gee_service_account or (not settings.gee_key_file and not settings.gee_key_json):
+        return {"error": "Google Earth Engine not configured"}
+
+    data = get_fire_trend_tile_url(
         service_account=settings.gee_service_account,
         key_file=settings.gee_key_file,
         project=settings.gee_project,

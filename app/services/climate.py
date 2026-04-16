@@ -343,3 +343,144 @@ def get_temperature_trend_tile_url(
         "period": "1981-2024",
         "units": "°C change per decade",
     }
+
+
+def get_fire_trend_tile_url(
+    service_account: str,
+    key_file: str,
+    project: str,
+    key_json: str = "",
+) -> dict:
+    """
+    Per-pixel fire frequency trend (2001-2024) from MODIS MCD64A1 (500m).
+    For each year a binary burned mask is created (1 = burned, 0 = not).
+    linearFit across the 24 annual masks gives the trend in burn frequency.
+    """
+    _init_ee(service_account, key_file, project, key_json=key_json)
+
+    collection = ee.ImageCollection("MODIS/061/MCD64A1")
+    years = list(range(2001, 2025))
+    annual_images = []
+
+    for yr in years:
+        annual_burned = (
+            collection
+            .filterDate(f"{yr}-01-01", f"{yr + 1}-01-01")
+            .select("BurnDate")
+            .max()
+            .gt(0)
+            .unmask(0)
+            .rename("burned")
+        )
+        t_val = yr - 2001
+        with_time = annual_burned.addBands(
+            ee.Image.constant(t_val).float().rename("t")
+        )
+        annual_images.append(with_time)
+
+    annual_col = ee.ImageCollection(annual_images)
+    trend = annual_col.select(["t", "burned"]).reduce(ee.Reducer.linearFit())
+    slope_decade = trend.select("scale").multiply(10)
+
+    vis_params = {
+        "min": -0.15,
+        "max": 0.15,
+        "palette": [
+            "#08519c", "#6baed6", "#bdd7e7",
+            "#F5F5F5",
+            "#fdae6b", "#e6550d", "#7f2704",
+        ],
+    }
+
+    map_id = slope_decade.getMapId(vis_params)
+    tile_url = map_id["tile_fetcher"].url_format
+
+    return {
+        "tile_url": tile_url,
+        "dataset": "MODIS MCD64A1 trend",
+        "resolution_m": 500,
+        "period": "2001-2024",
+        "units": "fire freq. change per decade",
+    }
+
+
+async def fetch_fire_history(
+    bbox: list,
+    service_account: str,
+    key_file: str,
+    project: str,
+    key_json: str = "",
+    start_year: int = 2001,
+    end_year: int = 2024,
+) -> dict:
+    """
+    Fetch yearly burned-area fraction averaged across all pixels in bbox.
+    Uses MODIS MCD64A1 (500m, global, 2000-present).
+    Returns yearly values + anomalies relative to 2001-2010 baseline.
+    bbox: [swlat, swlng, nelat, nelng]
+    """
+    _init_ee(service_account, key_file, project, key_json=key_json)
+
+    region = ee.Geometry.Rectangle([bbox[1], bbox[0], bbox[3], bbox[2]])
+    collection = ee.ImageCollection("MODIS/061/MCD64A1")
+    actual_start = max(start_year, 2001)
+    years = list(range(actual_start, end_year + 1))
+
+    def yearly_burn_fraction(year):
+        y = ee.Number(year)
+        burned = (
+            collection
+            .filter(ee.Filter.calendarRange(y, y, "year"))
+            .select("BurnDate")
+            .max()
+            .gt(0)
+            .unmask(0)
+        )
+        frac = burned.reduceRegion(
+            ee.Reducer.mean(), region, 500, maxPixels=1e7
+        ).get("BurnDate")
+        return ee.Feature(None, {"year": y, "burned_fraction": frac})
+
+    fc = ee.FeatureCollection([yearly_burn_fraction(y) for y in years])
+    data = fc.getInfo()
+
+    yearly_fire = []
+    for f in data["features"]:
+        p = f["properties"]
+        if p.get("burned_fraction") is not None:
+            yearly_fire.append({
+                "year": int(p["year"]),
+                "burned_fraction": round(p["burned_fraction"], 6),
+            })
+
+    if not yearly_fire:
+        return {
+            "dataset": "MODIS MCD64A1",
+            "resolution_m": 500,
+            "years": [],
+            "baseline_mean": None,
+            "current_anomaly": None,
+            "trend_per_decade": None,
+        }
+
+    baseline = [v["burned_fraction"] for v in yearly_fire if 2001 <= v["year"] <= 2010]
+    baseline_mean = round(sum(baseline) / len(baseline), 6) if baseline else None
+
+    for v in yearly_fire:
+        v["anomaly"] = (
+            round(v["burned_fraction"] - baseline_mean, 6)
+            if baseline_mean is not None else None
+        )
+
+    current_anomaly = yearly_fire[-1]["anomaly"] if yearly_fire else None
+    trend = _compute_trend_per_decade(yearly_fire, val_key="anomaly")
+
+    return {
+        "dataset": "MODIS MCD64A1",
+        "resolution_m": 500,
+        "baseline_period": "2001-2010",
+        "baseline_mean": baseline_mean,
+        "current_anomaly": current_anomaly,
+        "trend_per_decade": trend,
+        "years": yearly_fire,
+    }
