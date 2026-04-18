@@ -763,6 +763,13 @@ body {
   .obs-popup { flex-direction: column; }
   .obs-popup img { width: 100%; height: 100px; }
   .species-tooltip { display: none; }
+
+  /* Keep map attribution from overlapping the layer legend */
+  .leaflet-control-attribution {
+    max-width: 55%;
+    font-size: 8px;
+    line-height: 1.2;
+  }
 }
 
 /* ── Source badge on species cards ── */
