@@ -2,7 +2,7 @@
 
 ## Project overview
 
-A web app that shows biodiversity (species, observations) along a running/cycling route. Users connect their Strava account or upload a GPX file, and the app queries iNaturalist for species observed near the route, displays them on an interactive map, and shows indigenous territory information from Native Land Digital.
+A web app that situates humans in the living landscape — exploring the biological, geological, and environmental character of any route or location. Users connect Strava, upload a GPX file, or use Situate to search anywhere. The app aggregates data from iNaturalist, GBIF, eBird, Xeno-Canto, Macrostrat, Mindat, Google Earth Engine, and Native Land Digital to show species, geomaterials, environmental trends, and indigenous territories.
 
 **Live site:** https://bioroute.pedrolab.org (deployed on Railway)
 
@@ -21,15 +21,17 @@ app/
 ├── config.py                # Pydantic Settings (env vars)
 ├── routers/
 │   ├── auth.py              # Strava OAuth flow (login, callback, logout, status)
-│   └── api.py               # REST endpoints (activities, species, observations, territories, GBIF, eBird)
+│   └── api.py               # REST endpoints (activities, species, geology, climate, territories)
 ├── services/
 │   ├── strava.py            # Strava API client, token refresh, activity caching
 │   ├── biodiversity.py      # iNaturalist, Native Land, BigDataCloud, GBIF APIs, convex hull
-│   └── ebird.py             # eBird API client (recent + notable observations)
+│   ├── ebird.py             # eBird API client (recent + notable observations)
+│   ├── geology.py           # Macrostrat, Mindat, Wikipedia geology services
+│   └── climate.py           # Google Earth Engine: temperature, NDVI, fire trends
 └── static/
     ├── index.html           # SPA shell (3-panel layout: sidebar, center, map)
     ├── styles.css            # Custom CSS (desktop 3-panel + mobile responsive)
-    └── app.js               # All client-side logic (iNat, GBIF merge, eBird rendering)
+    └── app.js               # All client-side logic
 ```
 
 ## Key env vars
@@ -42,6 +44,12 @@ app/
 | `SESSION_SECRET` | Session cookie signing key |
 | `NATIVE_LAND_API_KEY` | Native Land Digital API key |
 | `EBIRD_API_KEY` | eBird / Cornell Lab API key |
+| `MINDAT_API_KEY` | Mindat mineral database API key |
+| `XENOCANTO_API_KEY` | Xeno-Canto bird sound API key |
+| `GEE_SERVICE_ACCOUNT` | Google Earth Engine service account |
+| `GEE_KEY_FILE` | GEE service account key file path |
+| `GEE_KEY_JSON` | Inline GEE key JSON (for Railway) |
+| `GEE_PROJECT` | Google Cloud project ID for GEE |
 
 Local dev uses `.env` file. Production uses Railway env vars.
 
@@ -65,17 +73,22 @@ Then open http://localhost:8000
 
 ## Frontend layout
 
-- **Desktop:** 3-panel — sidebar (220px, route input + activities + taxa filters + data sources + eBird), center (filters bar + species grid + eBird list), map (50%)
-- **Mobile:** After route loaded, sidebar collapses into a "Fetch route" dropdown button. Taxa filters appear as wrapping pills in the filters bar. Data Sources and eBird sidebar sections are hidden on mobile. Map is always visible at 35vh. Species grid is 2 columns.
+- **Desktop:** 3-panel — sidebar (220px, route input + activities + taxa filters + data sources), center (environment + geomaterials + filters bar + species grid), map (50%)
+- **Mobile:** Persistent Activities/Situate nav bar at top. Sidebar opens as dropdown overlay. Map at 50vh with fullscreen toggle. Species grid is 2 columns. Environment starts collapsed.
 
 ## External APIs
 
 - **Strava API** — OAuth2 auth, activity list, activity streams (lat/lng)
-- **iNaturalist API** — `/v1/observations/species_counts` and `/v1/observations` for species and observation data
-- **GBIF API** — `/v1/occurrence/search` for global biodiversity occurrences; also used for historical eBird data via dataset key filtering
-- **eBird API** — `/v2/data/obs/geo/recent` and `/v2/data/obs/geo/recent/notable` for recent bird sightings (requires API key)
-- **Native Land Digital API** — Indigenous territory lookup (requires API key)
-- **BigDataCloud** — Reverse geocoding for country identification
+- **iNaturalist API** — species observations across all taxa
+- **GBIF API** — global biodiversity occurrences; also historical eBird data via dataset key
+- **eBird API** — recent and notable bird sightings (requires API key)
+- **Xeno-Canto API** — bird sound recordings
+- **Macrostrat API** — rock formations and lithology at sampled points
+- **Mindat API** — minerals and localities near the route
+- **Wikipedia API** — geological descriptions and rock types
+- **Google Earth Engine** — temperature, NDVI, and fire trend analysis via satellite data (PRISM, ERA5-Land, MODIS)
+- **Native Land Digital API** — indigenous territory lookup (requires API key)
+- **BigDataCloud** — reverse geocoding for country/state/county
 
 ## Deployment
 
@@ -97,7 +110,16 @@ railway variables set KEY=value
 | `/api/species` | POST | iNaturalist species by taxa (bbox, month, hull) |
 | `/api/observations` | POST | iNaturalist observations (bbox, month, taxon_id, hull) |
 | `/api/territories` | POST | Native Land territories + country (bbox) |
+| `/api/geology` | POST | Geomaterials for route (Macrostrat + Mindat + Wikipedia) |
+| `/api/geology/point` | POST | Geology at a single map click point |
+| `/api/climate` | POST | Temperature anomaly time series (PRISM/ERA5-Land) |
+| `/api/climate/ndvi` | POST | NDVI vegetation time series (MODIS) |
+| `/api/climate/ndvi-tiles` | POST | NDVI trend map tile URL (GEE) |
+| `/api/climate/temp-tiles` | POST | Temperature trend map tile URL (GEE) |
+| `/api/climate/fire-tiles` | POST | Fire trend map tile URL (GEE) |
+| `/api/birdsong` | GET | Bird sound recording from Xeno-Canto |
 | `/api/gbif/species` | POST | GBIF species by taxa (bbox, month, hull) |
+| `/api/gbif/observations` | POST | GBIF observations (bbox, month, taxon_id, hull) |
 | `/api/ebird/recent` | POST | eBird recent sightings (coords, dist_km, back_days) |
 | `/api/ebird/notable` | POST | eBird notable sightings (coords, dist_km, back_days) |
 | `/api/ebird/historical` | POST | eBird all-time historical via GBIF (bbox, hull) |
