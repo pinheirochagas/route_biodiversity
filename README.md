@@ -67,7 +67,7 @@ Environmental trends are computed via [Google Earth Engine](https://earthengine.
 - Annual mean temperature time series relative to a 1951-1980 baseline
 - Displayed as warming stripes (blue-to-red gradient)
 - Shows current anomaly and warming rate per decade
-- Data: [PRISM](https://prism.oregonstate.edu) at 800m resolution for the contiguous US, [ERA5-Land](https://cds.climate.copernicus.eu) at 11km globally
+- Data: [PRISM](https://prism.oregonstate.edu) at ~4km resolution for the contiguous US, [ERA5-Land](https://cds.climate.copernicus.eu) at 11km globally
 
 **Vegetation health (NDVI):**
 
@@ -80,7 +80,7 @@ Environmental trends are computed via [Google Earth Engine](https://earthengine.
 
 | Layer | Dataset | Resolution | Period |
 |---|---|---|---|
-| Temperature trend | PRISM + ERA5-Land mosaic | 800m / 11km | 1981-2024 |
+| Temperature trend | PRISM (US) + ERA5-Land (global) | ~4km / 11km | 1981-2024 |
 | Vegetation trend | MODIS MOD13Q1 | 250m | 2000-2024 |
 | Fire trend | MODIS MCD64A1 | 500m | 2001-2024 |
 

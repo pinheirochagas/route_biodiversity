@@ -276,6 +276,29 @@ def get_ndvi_trend_tile_url(
     }
 
 
+def _build_annual_trend(collection, band, start_year, end_year):
+    """Server-side annual compositing + linearFit trend (°C per decade)."""
+    years_list = ee.List.sequence(start_year, end_year)
+
+    def annual_with_time(y):
+        y = ee.Number(y)
+        annual = (
+            collection
+            .filter(ee.Filter.date(
+                ee.Date.fromYMD(y, 1, 1),
+                ee.Date.fromYMD(y.add(1), 1, 1),
+            ))
+            .mean()
+            .rename("val")
+        )
+        t = ee.Image(y.subtract(start_year)).float().rename("t")
+        return annual.addBands(t).set("year", y)
+
+    annual_col = ee.ImageCollection(years_list.map(annual_with_time))
+    trend = annual_col.select(["t", "val"]).reduce(ee.Reducer.linearFit())
+    return trend.select("scale").multiply(10)
+
+
 def get_temperature_trend_tile_url(
     service_account: str,
     key_file: str,
@@ -283,45 +306,28 @@ def get_temperature_trend_tile_url(
     key_json: str = "",
 ) -> dict:
     """
-    Per-pixel air temperature trend mosaic:
-    PRISM (800m, CONUS, 1895-present) on top of ERA5-Land (11km, global, 1950-present).
-    Both use annual means → linearFit for the trend.
+    Per-pixel air temperature trend:
+    PRISM (~4km, CONUS) on top of ERA5-Land (11km, global).
+    Uses server-side annual compositing for efficient tile serving.
     """
     _init_ee(service_account, key_file, project, key_json=key_json)
 
-    years = list(range(1981, 2025))
-    band_name = "temp"
+    start_yr, end_yr = 1981, 2024
 
-    # PRISM: already annual, just select tmean (CONUS only, 800m)
+    # PRISM: monthly tmean → annual mean (CONUS, ~4km)
     prism = ee.ImageCollection("OREGONSTATE/PRISM/ANm").select("tmean")
-    prism_annual = []
-    for yr in years:
-        img = prism.filter(ee.Filter.calendarRange(yr, yr, "year")).mean()
-        t_val = yr - years[0]
-        prism_annual.append(
-            img.rename(band_name).addBands(ee.Image.constant(t_val).float().rename("t"))
-        )
+    prism_trend = _build_annual_trend(prism, "tmean", start_yr, end_yr)
 
-    prism_trend = ee.ImageCollection(prism_annual).select(["t", band_name]).reduce(
-        ee.Reducer.linearFit()
-    ).select("scale").multiply(10)  # C per decade
+    # ERA5-Land: monthly → annual mean, K→C (global, 11km)
+    era5_raw = ee.ImageCollection("ECMWF/ERA5_LAND/MONTHLY_AGGR").select("temperature_2m")
+    era5_c = era5_raw.map(
+        lambda img: img.subtract(273.15).rename("val")
+            .copyProperties(img, ["system:time_start"])
+    )
+    era5_trend = _build_annual_trend(era5_c, "val", start_yr, end_yr)
 
-    # ERA5-Land: monthly → annual mean, convert K to C (global, 11km)
-    era5 = ee.ImageCollection("ECMWF/ERA5_LAND/MONTHLY_AGGR").select("temperature_2m")
-    era5_annual = []
-    for yr in years:
-        img = era5.filter(ee.Filter.calendarRange(yr, yr, "year")).mean().subtract(273.15)
-        t_val = yr - years[0]
-        era5_annual.append(
-            img.rename(band_name).addBands(ee.Image.constant(t_val).float().rename("t"))
-        )
-
-    era5_trend = ee.ImageCollection(era5_annual).select(["t", band_name]).reduce(
-        ee.Reducer.linearFit()
-    ).select("scale").multiply(10)
-
-    # Mosaic: PRISM (high-res) on top, ERA5-Land fills everywhere else
-    mosaic = ee.ImageCollection([era5_trend, prism_trend]).mosaic()
+    # PRISM on top where available, ERA5-Land fills globally
+    combined = prism_trend.unmask(era5_trend)
 
     vis_params = {
         "min": -0.5,
@@ -333,13 +339,13 @@ def get_temperature_trend_tile_url(
         ],
     }
 
-    map_id = mosaic.getMapId(vis_params)
+    map_id = combined.getMapId(vis_params)
     tile_url = map_id["tile_fetcher"].url_format
 
     return {
         "tile_url": tile_url,
-        "dataset": "PRISM 800m + ERA5-Land 11km",
-        "resolution_m": 800,
+        "dataset": "PRISM ~4km (US) + ERA5-Land 11km (global)",
+        "resolution_m": 4000,
         "period": "1981-2024",
         "units": "°C change per decade",
     }

@@ -1944,7 +1944,7 @@ window.retryImg = function (img) {
         tempTileLayer = L.tileLayer(data.tile_url, {
           opacity: 0.45,
           maxZoom: 18,
-          attribution: "MODIS LST 1km &copy; NASA/Google Earth Engine",
+          attribution: "PRISM + ERA5-Land &copy; Google Earth Engine",
         });
         const tempCb = document.querySelector('.map-layer-row input[data-layer="temp"]');
         if (tempCb && tempCb.checked) tempTileLayer.addTo(leafletMap);
