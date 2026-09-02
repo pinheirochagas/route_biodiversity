@@ -52,6 +52,7 @@ window.retryImg = function (img) {
   let climateData = null;
   let ndviData = null;
   let ndviTileLayer = null;
+  let ndviTileLoading = false;
   let tempTileLayer = null;
   let fireTileLayer = null;
 
@@ -1953,40 +1954,45 @@ window.retryImg = function (img) {
   }
 
   // ── NDVI data ──
-  async function fetchNdviData(bbox) {
+  async function fetchNdviTiles() {
+    if (ndviTileLayer || ndviTileLoading) return;
+    ndviTileLoading = true;
     try {
-      const [tsResp, tileResp] = await Promise.allSettled([
-        fetch("/api/climate/ndvi", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bbox }),
-        }),
-        fetch("/api/climate/ndvi-tiles", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ year: 2024 }),
-        }),
-      ]);
+      const resp = await fetch("/api/climate/ndvi-tiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await resp.json();
+      if (data.tile_url && leafletMap) {
+        ndviTileLayer = L.tileLayer(data.tile_url, {
+          opacity: 0.45,
+          maxZoom: 18,
+          attribution: "MODIS NDVI 250m &copy; NASA/Google Earth Engine",
+        });
+        const ndviCb = document.querySelector('.map-layer-row input[data-layer="ndvi"]');
+        if (ndviCb && ndviCb.checked) ndviTileLayer.addTo(leafletMap);
+      }
+    } catch (_) {
+      // Leave the layer unset so the next toggle can retry.
+    } finally {
+      ndviTileLoading = false;
+    }
+  }
 
-      if (tsResp.status === "fulfilled" && tsResp.value.ok) {
-        const data = await tsResp.value.json();
+  async function fetchNdviData(bbox) {
+    fetchNdviTiles();
+    try {
+      const resp = await fetch("/api/climate/ndvi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bbox }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
         if (!data.error) {
           ndviData = data;
           if (climateEnabled) renderNdviSection(data);
-        }
-      }
-
-      if (tileResp.status === "fulfilled" && tileResp.value.ok) {
-        const tileData = await tileResp.value.json();
-        if (tileData.tile_url && leafletMap) {
-          if (ndviTileLayer) leafletMap.removeLayer(ndviTileLayer);
-          ndviTileLayer = L.tileLayer(tileData.tile_url, {
-            opacity: 0.45,
-            maxZoom: 18,
-            attribution: "MODIS NDVI 250m &copy; NASA/Google Earth Engine",
-          });
-          const ndviCb = document.querySelector('.map-layer-row input[data-layer="ndvi"]');
-          if (ndviCb && ndviCb.checked) ndviTileLayer.addTo(leafletMap);
         }
       }
     } catch (_) {}
@@ -2303,9 +2309,13 @@ window.retryImg = function (img) {
             cb.addEventListener("change", toggleGeologyLayer);
           } else if (lyr.id === "ndvi") {
             cb.addEventListener("change", () => {
-              if (!leafletMap || !ndviTileLayer) return;
-              if (cb.checked) ndviTileLayer.addTo(leafletMap);
-              else leafletMap.removeLayer(ndviTileLayer);
+              if (!leafletMap) return;
+              if (cb.checked) {
+                if (!ndviTileLayer) fetchNdviTiles();
+                else ndviTileLayer.addTo(leafletMap);
+              } else if (ndviTileLayer) {
+                leafletMap.removeLayer(ndviTileLayer);
+              }
             });
           } else if (lyr.id === "temp") {
             cb.addEventListener("change", () => {
