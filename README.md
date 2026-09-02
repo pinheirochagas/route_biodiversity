@@ -94,7 +94,7 @@ Each layer shows per-pixel linear trends (blue = decreasing, red = increasing) c
 
 ### Map
 
-- Interactive [Leaflet.js](https://leafletjs.com) map with the [Mapbox Outdoors](https://www.mapbox.com/maps/outdoors) basemap
+- Interactive [Leaflet.js](https://leafletjs.com) map with the [Mapbox Light](https://www.mapbox.com/maps/light-dark) basemap
 - Species observation markers with photo popups
 - eBird cluster markers with hotspot grouping
 - Geology overlay (Macrostrat tiles) with click-to-query

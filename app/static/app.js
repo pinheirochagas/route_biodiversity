@@ -2239,13 +2239,12 @@ window.retryImg = function (img) {
 
       const token = encodeURIComponent(data.mapbox_token);
       basemap = L.tileLayer(
-        `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
+        `https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
         {
           tileSize: 512,
           zoomOffset: -1,
           maxZoom: 22,
           zIndex: 0,
-          className: "mapbox-basemap",
           attribution:
             '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> ' +
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
