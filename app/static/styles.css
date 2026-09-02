@@ -211,6 +211,9 @@ body {
 #map {
   z-index: 0;
 }
+.mapbox-basemap {
+  filter: grayscale(1);
+}
 
 /* ── Tabs & Mode buttons ── */
 .tab-btn,

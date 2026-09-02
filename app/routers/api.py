@@ -39,6 +39,14 @@ from app.services.climate import (
 router = APIRouter(prefix="/api", tags=["api"])
 
 
+@router.get("/map-config")
+async def get_map_config(settings: Settings = Depends(get_settings)):
+    token = settings.mapbox_token.strip()
+    if token and not token.startswith("pk."):
+        raise HTTPException(500, "MAPBOX_TOKEN must be a public token beginning with pk.")
+    return {"mapbox_token": token}
+
+
 def _require_strava(request: Request) -> dict:
     strava = request.session.get("strava")
     if not strava or not strava.get("access_token"):

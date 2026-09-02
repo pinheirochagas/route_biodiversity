@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     mindat_api_key: str = ""
     google_api_key: str = ""
     xenocanto_api_key: str = ""
+    mapbox_token: str = ""
     gee_service_account: str = ""
     gee_key_file: str = ""
     gee_key_json: str = ""

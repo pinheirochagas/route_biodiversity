@@ -2229,13 +2229,43 @@ window.retryImg = function (img) {
   }
 
   // ── Map ──
+  async function loadBasemap() {
+    let basemap;
+    try {
+      const resp = await fetch("/api/map-config");
+      if (!resp.ok) throw new Error(`Map config returned ${resp.status}`);
+      const data = await resp.json();
+      if (!data.mapbox_token) throw new Error("MAPBOX_TOKEN is not configured");
+
+      const token = encodeURIComponent(data.mapbox_token);
+      basemap = L.tileLayer(
+        `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
+        {
+          tileSize: 512,
+          zoomOffset: -1,
+          maxZoom: 22,
+          zIndex: 0,
+          className: "mapbox-basemap",
+          attribution:
+            '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> ' +
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        }
+      );
+    } catch (error) {
+      console.warn("Mapbox basemap unavailable; using OpenStreetMap.", error);
+      basemap = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        zIndex: 0,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      });
+    }
+    basemap.addTo(leafletMap);
+  }
+
   function initMap() {
     leafletMap = L.map("map", { zoomControl: true, scrollWheelZoom: true });
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-      maxZoom: 19,
-    }).addTo(leafletMap);
+    loadBasemap();
 
     leafletMap.setView([37.7749, -122.4194], 12);
 
